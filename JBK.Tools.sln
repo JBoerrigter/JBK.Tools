@@ -1,0 +1,25 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.7.34202.233
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JBK.Tools.MapExtractor", "JBK.Tools.MapExtractor\JBK.Tools.MapExtractor.csproj", "{4AAAC7E6-6E88-4CB9-A2B8-CB859E372DB5}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{4AAAC7E6-6E88-4CB9-A2B8-CB859E372DB5}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{4AAAC7E6-6E88-4CB9-A2B8-CB859E372DB5}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{4AAAC7E6-6E88-4CB9-A2B8-CB859E372DB5}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{4AAAC7E6-6E88-4CB9-A2B8-CB859E372DB5}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {03B10A41-290D-46A4-9E68-865C5A493F25}
+	EndGlobalSection
+EndGlobal
