@@ -106,5 +106,51 @@ namespace JBK.Tools.MapExtractor
             int index = (int)((ToolStripMenuItem)sender).Tag;
             Save(_map.TextureMaps[index].GetImage());
         }
+
+        private void GetHeightmapsToolStripMenuItem_Click(object sender, EventArgs e)
+        {
+            if (BatchDialog.ShowDialog() == DialogResult.OK)
+            {
+                DirectoryInfo dir = new DirectoryInfo(BatchDialog.SelectedPath);
+                if (!dir.Exists) return;
+
+                LabelConverting.Visible = true;
+                ProgressBatch.Visible = true;
+                ProgressBatch.Value = 0;
+
+                FileInfo[] files = dir.GetFiles("*.kcm");
+                ProgressBatch.Maximum = files.Length;
+
+                BatchWorker.RunWorkerAsync(files);
+
+            }
+        }
+
+        private void BatchWorker_DoWork(object sender, System.ComponentModel.DoWorkEventArgs e)
+        {
+            FileInfo[] files = e.Argument as FileInfo[];
+
+            string path = "HeightMaps";
+            if (!Directory.Exists(path)) Directory.CreateDirectory(path);
+
+            for (int i = 0; i < files.Length; i++)
+            {
+                BatchWorker.ReportProgress(i);
+                ClientMap map = new ClientMap(files[i].FullName);
+                string fileName = Path.Combine(path, Path.ChangeExtension(files[i].Name, ".tiff"));
+                map.HeightMap.Save16BitHeightmap(fileName);
+            }
+        }
+
+        private void BatchWorker_ProgressChanged(object sender, System.ComponentModel.ProgressChangedEventArgs e)
+        {
+            ProgressBatch.Value = e.ProgressPercentage;
+        }
+
+        private void BatchWorker_RunWorkerCompleted(object sender, System.ComponentModel.RunWorkerCompletedEventArgs e)
+        {
+            LabelConverting.Visible = false;
+            ProgressBatch.Visible = false;
+        }
     }
 }

@@ -45,6 +45,8 @@
             texturemap7ToolStripMenuItem = new ToolStripMenuItem();
             toolStripMenuItem1 = new ToolStripSeparator();
             exitToolStripMenuItem = new ToolStripMenuItem();
+            batchToolStripMenuItem = new ToolStripMenuItem();
+            getHeightmapsToolStripMenuItem = new ToolStripMenuItem();
             PicHeightmap = new PictureBox();
             OpenClientMapDialog = new OpenFileDialog();
             SaveImageDialog = new SaveFileDialog();
@@ -74,6 +76,11 @@
             PicTexmap6 = new PictureBox();
             PageTex7 = new TabPage();
             PicTexmap7 = new PictureBox();
+            BatchDialog = new FolderBrowserDialog();
+            MainStatusBar = new StatusStrip();
+            LabelConverting = new ToolStripStatusLabel();
+            ProgressBatch = new ToolStripProgressBar();
+            this.BatchWorker = new System.ComponentModel.BackgroundWorker();
             MainMenu.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)PicHeightmap).BeginInit();
             tabControl1.SuspendLayout();
@@ -102,11 +109,12 @@
             ((System.ComponentModel.ISupportInitialize)PicTexmap6).BeginInit();
             PageTex7.SuspendLayout();
             ((System.ComponentModel.ISupportInitialize)PicTexmap7).BeginInit();
+            MainStatusBar.SuspendLayout();
             this.SuspendLayout();
             // 
             // MainMenu
             // 
-            MainMenu.Items.AddRange(new ToolStripItem[] { programToolStripMenuItem });
+            MainMenu.Items.AddRange(new ToolStripItem[] { programToolStripMenuItem, batchToolStripMenuItem });
             MainMenu.Location = new Point(0, 0);
             MainMenu.Name = "MainMenu";
             MainMenu.Size = new Size(623, 24);
@@ -230,12 +238,26 @@
             exitToolStripMenuItem.Text = "Exit";
             exitToolStripMenuItem.Click += this.ExitToolStripMenuItem_Click;
             // 
+            // batchToolStripMenuItem
+            // 
+            batchToolStripMenuItem.DropDownItems.AddRange(new ToolStripItem[] { getHeightmapsToolStripMenuItem });
+            batchToolStripMenuItem.Name = "batchToolStripMenuItem";
+            batchToolStripMenuItem.Size = new Size(49, 20);
+            batchToolStripMenuItem.Text = "Batch";
+            // 
+            // getHeightmapsToolStripMenuItem
+            // 
+            getHeightmapsToolStripMenuItem.Name = "getHeightmapsToolStripMenuItem";
+            getHeightmapsToolStripMenuItem.Size = new Size(160, 22);
+            getHeightmapsToolStripMenuItem.Text = "Get Heightmaps";
+            getHeightmapsToolStripMenuItem.Click += this.GetHeightmapsToolStripMenuItem_Click;
+            // 
             // PicHeightmap
             // 
             PicHeightmap.Dock = DockStyle.Fill;
             PicHeightmap.Location = new Point(3, 3);
             PicHeightmap.Name = "PicHeightmap";
-            PicHeightmap.Size = new Size(571, 367);
+            PicHeightmap.Size = new Size(571, 316);
             PicHeightmap.SizeMode = PictureBoxSizeMode.Zoom;
             PicHeightmap.TabIndex = 0;
             PicHeightmap.TabStop = false;
@@ -258,7 +280,7 @@
             tabControl1.Location = new Point(12, 35);
             tabControl1.Name = "tabControl1";
             tabControl1.SelectedIndex = 0;
-            tabControl1.Size = new Size(599, 435);
+            tabControl1.Size = new Size(599, 384);
             tabControl1.TabIndex = 1;
             // 
             // PageHeightmap
@@ -267,7 +289,7 @@
             PageHeightmap.Location = new Point(4, 24);
             PageHeightmap.Name = "PageHeightmap";
             PageHeightmap.Padding = new Padding(3);
-            PageHeightmap.Size = new Size(591, 407);
+            PageHeightmap.Size = new Size(591, 356);
             PageHeightmap.TabIndex = 0;
             PageHeightmap.Text = "Heightmap";
             PageHeightmap.UseVisualStyleBackColor = true;
@@ -280,7 +302,7 @@
             TabCtlHeightmap.Location = new Point(3, 3);
             TabCtlHeightmap.Name = "TabCtlHeightmap";
             TabCtlHeightmap.SelectedIndex = 0;
-            TabCtlHeightmap.Size = new Size(585, 401);
+            TabCtlHeightmap.Size = new Size(585, 350);
             TabCtlHeightmap.TabIndex = 1;
             // 
             // PageHeightmapImage
@@ -289,7 +311,7 @@
             PageHeightmapImage.Location = new Point(4, 24);
             PageHeightmapImage.Name = "PageHeightmapImage";
             PageHeightmapImage.Padding = new Padding(3);
-            PageHeightmapImage.Size = new Size(577, 373);
+            PageHeightmapImage.Size = new Size(577, 322);
             PageHeightmapImage.TabIndex = 0;
             PageHeightmapImage.Text = "Image";
             PageHeightmapImage.UseVisualStyleBackColor = true;
@@ -300,7 +322,7 @@
             PageHeightmapData.Location = new Point(4, 24);
             PageHeightmapData.Name = "PageHeightmapData";
             PageHeightmapData.Padding = new Padding(3);
-            PageHeightmapData.Size = new Size(577, 373);
+            PageHeightmapData.Size = new Size(577, 322);
             PageHeightmapData.TabIndex = 1;
             PageHeightmapData.Text = "Data";
             PageHeightmapData.UseVisualStyleBackColor = true;
@@ -312,7 +334,7 @@
             DataHeightmap.Location = new Point(3, 3);
             DataHeightmap.Name = "DataHeightmap";
             DataHeightmap.RowTemplate.Height = 25;
-            DataHeightmap.Size = new Size(571, 367);
+            DataHeightmap.Size = new Size(571, 316);
             DataHeightmap.TabIndex = 0;
             // 
             // PageColormap
@@ -321,7 +343,7 @@
             PageColormap.Location = new Point(4, 24);
             PageColormap.Name = "PageColormap";
             PageColormap.Padding = new Padding(3);
-            PageColormap.Size = new Size(591, 407);
+            PageColormap.Size = new Size(591, 356);
             PageColormap.TabIndex = 1;
             PageColormap.Text = "Colormap";
             PageColormap.UseVisualStyleBackColor = true;
@@ -331,7 +353,7 @@
             PicColormap.Dock = DockStyle.Fill;
             PicColormap.Location = new Point(3, 3);
             PicColormap.Name = "PicColormap";
-            PicColormap.Size = new Size(585, 401);
+            PicColormap.Size = new Size(585, 350);
             PicColormap.SizeMode = PictureBoxSizeMode.Zoom;
             PicColormap.TabIndex = 1;
             PicColormap.TabStop = false;
@@ -342,7 +364,7 @@
             PageObjectmap.Location = new Point(4, 24);
             PageObjectmap.Name = "PageObjectmap";
             PageObjectmap.Padding = new Padding(3);
-            PageObjectmap.Size = new Size(591, 407);
+            PageObjectmap.Size = new Size(591, 356);
             PageObjectmap.TabIndex = 2;
             PageObjectmap.Text = "Objectmap";
             PageObjectmap.UseVisualStyleBackColor = true;
@@ -352,7 +374,7 @@
             PicObjectmap.Dock = DockStyle.Fill;
             PicObjectmap.Location = new Point(3, 3);
             PicObjectmap.Name = "PicObjectmap";
-            PicObjectmap.Size = new Size(585, 401);
+            PicObjectmap.Size = new Size(585, 350);
             PicObjectmap.SizeMode = PictureBoxSizeMode.Zoom;
             PicObjectmap.TabIndex = 1;
             PicObjectmap.TabStop = false;
@@ -363,7 +385,7 @@
             PageTexturemaps.Location = new Point(4, 24);
             PageTexturemaps.Name = "PageTexturemaps";
             PageTexturemaps.Padding = new Padding(3);
-            PageTexturemaps.Size = new Size(591, 407);
+            PageTexturemaps.Size = new Size(591, 356);
             PageTexturemaps.TabIndex = 3;
             PageTexturemaps.Text = "Texturemaps";
             PageTexturemaps.UseVisualStyleBackColor = true;
@@ -381,7 +403,7 @@
             tabControl3.Location = new Point(3, 3);
             tabControl3.Name = "tabControl3";
             tabControl3.SelectedIndex = 0;
-            tabControl3.Size = new Size(585, 401);
+            tabControl3.Size = new Size(585, 350);
             tabControl3.TabIndex = 2;
             // 
             // PageTex1
@@ -390,7 +412,7 @@
             PageTex1.Location = new Point(4, 24);
             PageTex1.Name = "PageTex1";
             PageTex1.Padding = new Padding(3);
-            PageTex1.Size = new Size(577, 373);
+            PageTex1.Size = new Size(577, 322);
             PageTex1.TabIndex = 0;
             PageTex1.Text = "Nr. 1";
             PageTex1.UseVisualStyleBackColor = true;
@@ -400,7 +422,7 @@
             PicTexmap1.Dock = DockStyle.Fill;
             PicTexmap1.Location = new Point(3, 3);
             PicTexmap1.Name = "PicTexmap1";
-            PicTexmap1.Size = new Size(571, 367);
+            PicTexmap1.Size = new Size(571, 316);
             PicTexmap1.SizeMode = PictureBoxSizeMode.Zoom;
             PicTexmap1.TabIndex = 1;
             PicTexmap1.TabStop = false;
@@ -411,7 +433,7 @@
             PageTex2.Location = new Point(4, 24);
             PageTex2.Name = "PageTex2";
             PageTex2.Padding = new Padding(3);
-            PageTex2.Size = new Size(577, 373);
+            PageTex2.Size = new Size(577, 322);
             PageTex2.TabIndex = 1;
             PageTex2.Text = "Nr. 2";
             PageTex2.UseVisualStyleBackColor = true;
@@ -421,7 +443,7 @@
             PicTexmap2.Dock = DockStyle.Fill;
             PicTexmap2.Location = new Point(3, 3);
             PicTexmap2.Name = "PicTexmap2";
-            PicTexmap2.Size = new Size(571, 367);
+            PicTexmap2.Size = new Size(571, 316);
             PicTexmap2.SizeMode = PictureBoxSizeMode.Zoom;
             PicTexmap2.TabIndex = 2;
             PicTexmap2.TabStop = false;
@@ -432,7 +454,7 @@
             PageTex3.Location = new Point(4, 24);
             PageTex3.Name = "PageTex3";
             PageTex3.Padding = new Padding(3);
-            PageTex3.Size = new Size(577, 373);
+            PageTex3.Size = new Size(577, 322);
             PageTex3.TabIndex = 2;
             PageTex3.Text = "Nr. 3";
             PageTex3.UseVisualStyleBackColor = true;
@@ -442,7 +464,7 @@
             PicTexmap3.Dock = DockStyle.Fill;
             PicTexmap3.Location = new Point(3, 3);
             PicTexmap3.Name = "PicTexmap3";
-            PicTexmap3.Size = new Size(571, 367);
+            PicTexmap3.Size = new Size(571, 316);
             PicTexmap3.SizeMode = PictureBoxSizeMode.Zoom;
             PicTexmap3.TabIndex = 2;
             PicTexmap3.TabStop = false;
@@ -453,7 +475,7 @@
             PageTex4.Location = new Point(4, 24);
             PageTex4.Name = "PageTex4";
             PageTex4.Padding = new Padding(3);
-            PageTex4.Size = new Size(577, 373);
+            PageTex4.Size = new Size(577, 322);
             PageTex4.TabIndex = 3;
             PageTex4.Text = "Nr. 4";
             PageTex4.UseVisualStyleBackColor = true;
@@ -463,7 +485,7 @@
             PicTexmap4.Dock = DockStyle.Fill;
             PicTexmap4.Location = new Point(3, 3);
             PicTexmap4.Name = "PicTexmap4";
-            PicTexmap4.Size = new Size(571, 367);
+            PicTexmap4.Size = new Size(571, 316);
             PicTexmap4.SizeMode = PictureBoxSizeMode.Zoom;
             PicTexmap4.TabIndex = 2;
             PicTexmap4.TabStop = false;
@@ -474,7 +496,7 @@
             PageTex5.Location = new Point(4, 24);
             PageTex5.Name = "PageTex5";
             PageTex5.Padding = new Padding(3);
-            PageTex5.Size = new Size(577, 373);
+            PageTex5.Size = new Size(577, 322);
             PageTex5.TabIndex = 4;
             PageTex5.Text = "Nr. 5";
             PageTex5.UseVisualStyleBackColor = true;
@@ -484,7 +506,7 @@
             PicTexmap5.Dock = DockStyle.Fill;
             PicTexmap5.Location = new Point(3, 3);
             PicTexmap5.Name = "PicTexmap5";
-            PicTexmap5.Size = new Size(571, 367);
+            PicTexmap5.Size = new Size(571, 316);
             PicTexmap5.SizeMode = PictureBoxSizeMode.Zoom;
             PicTexmap5.TabIndex = 2;
             PicTexmap5.TabStop = false;
@@ -495,7 +517,7 @@
             PageTex6.Location = new Point(4, 24);
             PageTex6.Name = "PageTex6";
             PageTex6.Padding = new Padding(3);
-            PageTex6.Size = new Size(577, 373);
+            PageTex6.Size = new Size(577, 322);
             PageTex6.TabIndex = 5;
             PageTex6.Text = "Nr. 6";
             PageTex6.UseVisualStyleBackColor = true;
@@ -505,7 +527,7 @@
             PicTexmap6.Dock = DockStyle.Fill;
             PicTexmap6.Location = new Point(3, 3);
             PicTexmap6.Name = "PicTexmap6";
-            PicTexmap6.Size = new Size(571, 367);
+            PicTexmap6.Size = new Size(571, 316);
             PicTexmap6.SizeMode = PictureBoxSizeMode.Zoom;
             PicTexmap6.TabIndex = 2;
             PicTexmap6.TabStop = false;
@@ -516,7 +538,7 @@
             PageTex7.Location = new Point(4, 24);
             PageTex7.Name = "PageTex7";
             PageTex7.Padding = new Padding(3);
-            PageTex7.Size = new Size(577, 373);
+            PageTex7.Size = new Size(577, 322);
             PageTex7.TabIndex = 6;
             PageTex7.Text = "Nr. 7";
             PageTex7.UseVisualStyleBackColor = true;
@@ -526,16 +548,46 @@
             PicTexmap7.Dock = DockStyle.Fill;
             PicTexmap7.Location = new Point(3, 3);
             PicTexmap7.Name = "PicTexmap7";
-            PicTexmap7.Size = new Size(571, 367);
+            PicTexmap7.Size = new Size(571, 316);
             PicTexmap7.SizeMode = PictureBoxSizeMode.Zoom;
             PicTexmap7.TabIndex = 2;
             PicTexmap7.TabStop = false;
+            // 
+            // MainStatusBar
+            // 
+            MainStatusBar.Items.AddRange(new ToolStripItem[] { LabelConverting, ProgressBatch });
+            MainStatusBar.Location = new Point(0, 460);
+            MainStatusBar.Name = "MainStatusBar";
+            MainStatusBar.Size = new Size(623, 22);
+            MainStatusBar.TabIndex = 2;
+            MainStatusBar.Text = "statusStrip1";
+            // 
+            // LabelConverting
+            // 
+            LabelConverting.Name = "LabelConverting";
+            LabelConverting.Size = new Size(66, 17);
+            LabelConverting.Text = "Converting";
+            LabelConverting.Visible = false;
+            // 
+            // ProgressBatch
+            // 
+            ProgressBatch.Name = "ProgressBatch";
+            ProgressBatch.Size = new Size(100, 16);
+            ProgressBatch.Visible = false;
+            // 
+            // BatchWorker
+            // 
+            this.BatchWorker.WorkerReportsProgress = true;
+            this.BatchWorker.DoWork += this.BatchWorker_DoWork;
+            this.BatchWorker.ProgressChanged += this.BatchWorker_ProgressChanged;
+            this.BatchWorker.RunWorkerCompleted += this.BatchWorker_RunWorkerCompleted;
             // 
             // MainForm
             // 
             this.AutoScaleDimensions = new SizeF(7F, 15F);
             this.AutoScaleMode = AutoScaleMode.Font;
             this.ClientSize = new Size(623, 482);
+            this.Controls.Add(MainStatusBar);
             this.Controls.Add(tabControl1);
             this.Controls.Add(MainMenu);
             this.MainMenuStrip = MainMenu;
@@ -570,6 +622,8 @@
             ((System.ComponentModel.ISupportInitialize)PicTexmap6).EndInit();
             PageTex7.ResumeLayout(false);
             ((System.ComponentModel.ISupportInitialize)PicTexmap7).EndInit();
+            MainStatusBar.ResumeLayout(false);
+            MainStatusBar.PerformLayout();
             this.ResumeLayout(false);
             this.PerformLayout();
         }
@@ -628,5 +682,12 @@
         private PictureBox PicTexmap5;
         private PictureBox PicTexmap6;
         private PictureBox PicTexmap7;
+        private ToolStripMenuItem batchToolStripMenuItem;
+        private ToolStripMenuItem getHeightmapsToolStripMenuItem;
+        private FolderBrowserDialog BatchDialog;
+        private StatusStrip MainStatusBar;
+        private ToolStripStatusLabel LabelConverting;
+        private ToolStripProgressBar ProgressBatch;
+        private System.ComponentModel.BackgroundWorker BatchWorker;
     }
 }
