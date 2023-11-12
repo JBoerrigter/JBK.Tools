@@ -1,4 +1,5 @@
 using JBK.Tools.MapExtractor.Maps;
+using System.Data;
 
 namespace JBK.Tools.MapExtractor
 {
@@ -9,6 +10,7 @@ namespace JBK.Tools.MapExtractor
         public MainForm()
         {
             InitializeComponent();
+            DataHeightmap.AutoGenerateColumns = true;
         }
 
         private void OpenToolStripMenuItem_Click(object sender, EventArgs e)
@@ -31,20 +33,32 @@ namespace JBK.Tools.MapExtractor
                     PicTexmap6.Image = _map.TextureMaps[5]?.GetImage();
                     PicTexmap7.Image = _map.TextureMaps[6]?.GetImage();
 
-                    for (int i = 0; i < _map.HeightMap.Map.Length - 1; i++)
-                    {
-                        for (int j = 0; j < _map.HeightMap.Map.Length - 1; j++)
-                        {
-                            DataHeightmap.Rows.Add(i, j, _map.HeightMap.Map[i, j]);
-                        }
-                    }
-
+                    SetHeightMapData();
                 }
             }
             catch (Exception ex)
             {
                 MessageBox.Show(ex.Message, ex.Source);
             }
+        }
+
+        private void SetHeightMapData()
+        {
+            if (_map is null) return;
+
+            DataTable data = new();
+            data.Columns.Add("X");
+            data.Columns.Add("Y");
+            data.Columns.Add("Value");
+
+            for (int i = 0; i < 257; i++)
+            {
+                for (int j = 0; j < 257; j++)
+                {
+                    data.Rows.Add(i, j, _map.HeightMap.Map[i, j]);
+                }
+            }
+            DataHeightmap.DataSource = data;
         }
 
         private void ExitToolStripMenuItem_Click(object sender, EventArgs e)

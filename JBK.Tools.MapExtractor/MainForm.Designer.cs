@@ -54,10 +54,6 @@
             PageHeightmapImage = new TabPage();
             PageHeightmapData = new TabPage();
             DataHeightmap = new DataGridView();
-            X = new DataGridViewTextBoxColumn();
-            Y = new DataGridViewTextBoxColumn();
-            Val1 = new DataGridViewTextBoxColumn();
-            Val2 = new DataGridViewTextBoxColumn();
             PageColormap = new TabPage();
             PicColormap = new PictureBox();
             PageObjectmap = new TabPage();
@@ -312,33 +308,12 @@
             // DataHeightmap
             // 
             DataHeightmap.ColumnHeadersHeightSizeMode = DataGridViewColumnHeadersHeightSizeMode.AutoSize;
-            DataHeightmap.Columns.AddRange(new DataGridViewColumn[] { X, Y, Val1, Val2 });
             DataHeightmap.Dock = DockStyle.Fill;
             DataHeightmap.Location = new Point(3, 3);
             DataHeightmap.Name = "DataHeightmap";
             DataHeightmap.RowTemplate.Height = 25;
             DataHeightmap.Size = new Size(571, 367);
             DataHeightmap.TabIndex = 0;
-            // 
-            // X
-            // 
-            X.HeaderText = "X";
-            X.Name = "X";
-            // 
-            // Y
-            // 
-            Y.HeaderText = "Y";
-            Y.Name = "Y";
-            // 
-            // Val1
-            // 
-            Val1.HeaderText = "Calculated";
-            Val1.Name = "Val1";
-            // 
-            // Val2
-            // 
-            Val2.HeaderText = "Actual";
-            Val2.Name = "Val2";
             // 
             // PageColormap
             // 
@@ -653,9 +628,5 @@
         private PictureBox PicTexmap5;
         private PictureBox PicTexmap6;
         private PictureBox PicTexmap7;
-        private DataGridViewTextBoxColumn X;
-        private DataGridViewTextBoxColumn Y;
-        private DataGridViewTextBoxColumn Val1;
-        private DataGridViewTextBoxColumn Val2;
     }
 }
