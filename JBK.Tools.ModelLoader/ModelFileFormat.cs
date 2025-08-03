@@ -233,26 +233,6 @@ public class ModelFileFormat
         ReadBones(reader);
         ReadMaterials(reader);
         ReadMeshes(reader);
-
-        //animationHeaders = new AnimationHeader[header.anim_file_count];
-        //for (int i = 0; i < header.anim_file_count; i++)
-        //{
-        //    animationHeaders[i].szoption = reader.ReadUInt32();
-        //    animationHeaders[i].keyframe_count = reader.ReadUInt16();
-
-        //    Keyframe[] frames = new Keyframe[animationHeaders[i].keyframe_count];
-        //    for (int j = 0; j < animationHeaders[i].keyframe_count; j++)
-        //    {
-        //        frames[j].time = reader.ReadUInt16();
-        //        frames[j].option = reader.ReadUInt32();
-        //    }
-
-        //    for (int j = 0; j < header.bone_count; j++)
-        //    {
-        //        // todo ka
-        //        var ppAnimData = reader.ReadUInt16();
-        //    }
-        //}
         ReadAnimations(reader);
 
         if (header.cls_size > 0)
