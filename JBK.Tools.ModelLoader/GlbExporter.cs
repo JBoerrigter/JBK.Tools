@@ -18,71 +18,40 @@ public class GlbExporter
         NodeBuilder[]? boneNodes = null;
         Matrix4x4[]? inverseBindMatrices = null;
 
-
-
         // Bones
         if (sourceFile.header.bone_count > 0)
         {
             var armature = new NodeBuilder("Armature");
             scene.AddNode(armature);
 
-            // First pass: Read and convert matrices properly
             boneNodes = new NodeBuilder[sourceFile.bones.Length];
             inverseBindMatrices = new Matrix4x4[sourceFile.bones.Length];
 
+            // Single pass: Create nodes, calculate local transforms, and set inverse bind matrices.
             for (int i = 0; i < sourceFile.bones.Length; i++)
             {
-                var boneMatrix = sourceFile.bones[i].matrix;
+                // 1. The matrix from the file is the Inverse Bind Pose and is already in the
+                //    correct column-major layout for SharpGLTF. We use it directly.
+                var columnMajorInverseBindPose = sourceFile.bones[i].matrix;
+                inverseBindMatrices[i] = columnMajorInverseBindPose;
+
+                // 2. To get the Local Transform for the node's rest pose, we must invert the Inverse Bind Pose.
+                Matrix4x4.Invert(columnMajorInverseBindPose, out var columnMajorLocalTransform);
+
+                // 3. Create the node and set its local transform from the calculated matrix.
                 var node = new NodeBuilder($"bone_{i}");
-
-                // Convert to column-major order for SharpGLTF
-                boneMatrix = Matrix4x4.Transpose(boneMatrix);
-
-                // Apply the local transform. SharpGLTF uses TRS, so decompose the matrix.
-                if (Matrix4x4.Decompose(boneMatrix, out var scale, out var rotation, out var translation))
+                if (Matrix4x4.Decompose(columnMajorLocalTransform, out var scale, out var rotation, out var translation))
                 {
                     node.LocalTransform = new AffineTransform(translation, rotation, scale);
                 }
-
-                boneNodes[i] = node;
-
-                if (Matrix4x4.Decompose(boneMatrix, out scale, out rotation, out translation))
-                {
-                    var trs =
-                        Matrix4x4.CreateScale(scale) *
-                        Matrix4x4.CreateFromQuaternion(rotation) *
-                        Matrix4x4.CreateTranslation(translation);
-
-                    inverseBindMatrices[i] = Matrix4x4.Invert(trs, out var inv) ? inv : Matrix4x4.Identity;
-                }
                 else
                 {
-                    inverseBindMatrices[i] = Matrix4x4.Identity;
+                    node.LocalMatrix = columnMajorLocalTransform;
                 }
-                //// 1. The matrix from the file is the Inverse Bind Pose Matrix.
-                //var inverseBindPoseFromFile = sourceFile.bones[i].matrix;
-
-                //// 2. Transpose it for glTF's column-major format. This is the final matrix needed for skinning.
-                //inverseBindMatrices[i] = Matrix4x4.Transpose(inverseBindPoseFromFile);
-
-                //// 3. To get the bone's local transform, we must invert the transposed inverse bind pose matrix.
-                //Matrix4x4.Invert(inverseBindMatrices[i], out var localTransformMatrix);
-
-                //// 4. Create the node and set its local transform from the calculated matrix.
-                //var node = new NodeBuilder($"bone_{i}");
-                //if (Matrix4x4.Decompose(localTransformMatrix, out var scale, out var rotation, out var translation))
-                //{
-                //    node.LocalTransform = new AffineTransform(translation, rotation, scale);
-                //}
-                //else
-                //{
-                //    node.LocalMatrix = localTransformMatrix;
-                //}
-
-                //boneNodes[i] = node;
+                boneNodes[i] = node;
             }
 
-            // Second pass: Set up parent hierarchy
+            // Second pass: Set up the parent-child hierarchy between the nodes.
             for (int i = 0; i < sourceFile.bones.Length; i++)
             {
                 byte parentIndex = sourceFile.bones[i].parent;
