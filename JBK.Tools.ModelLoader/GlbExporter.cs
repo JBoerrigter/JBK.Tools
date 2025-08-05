@@ -27,18 +27,11 @@ public class GlbExporter
             boneNodes = new NodeBuilder[sourceFile.bones.Length];
             inverseBindMatrices = new Matrix4x4[sourceFile.bones.Length];
 
-            // Single pass: Create nodes, calculate local transforms, and set inverse bind matrices.
             for (int i = 0; i < sourceFile.bones.Length; i++)
             {
-                // 1. The matrix from the file is the Inverse Bind Pose and is already in the
-                //    correct column-major layout for SharpGLTF. We use it directly.
                 var columnMajorInverseBindPose = sourceFile.bones[i].matrix;
                 inverseBindMatrices[i] = columnMajorInverseBindPose;
-
-                // 2. To get the Local Transform for the node's rest pose, we must invert the Inverse Bind Pose.
                 Matrix4x4.Invert(columnMajorInverseBindPose, out var columnMajorLocalTransform);
-
-                // 3. Create the node and set its local transform from the calculated matrix.
                 var node = new NodeBuilder($"bone_{i}");
                 if (Matrix4x4.Decompose(columnMajorLocalTransform, out var scale, out var rotation, out var translation))
                 {
@@ -51,7 +44,6 @@ public class GlbExporter
                 boneNodes[i] = node;
             }
 
-            // Second pass: Set up the parent-child hierarchy between the nodes.
             for (int i = 0; i < sourceFile.bones.Length; i++)
             {
                 byte parentIndex = sourceFile.bones[i].parent;
@@ -62,6 +54,18 @@ public class GlbExporter
                 else
                 {
                     boneNodes[parentIndex].AddNode(boneNodes[i]);
+                }
+            }
+
+            const float boneTipLength = 0.1f;
+            foreach (var boneNode in boneNodes)
+            {
+                if (!boneNode.VisualChildren.Any())
+                {
+                    var tipNode = new NodeBuilder($"{boneNode.Name}_tip");
+                    tipNode.LocalTransform = new AffineTransform(Quaternion.Identity, Vector3.UnitY * boneTipLength);
+
+                    boneNode.AddNode(tipNode);
                 }
             }
         }
@@ -225,7 +229,7 @@ public class GlbExporter
                     result.Add(new VertexBuilder<VertexPositionNormal, VertexTexture1, VertexJoints4>(
                         new VertexPositionNormal(v.Position, v.Normal),
                         new VertexTexture1(v.TexCoord),
-                        new VertexJoints4()
+                        new VertexEmpty()
                     ));
                 }
                 VertexRigid rigid = (VertexRigid)vertices[0];
