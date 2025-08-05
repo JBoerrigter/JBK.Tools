@@ -292,8 +292,6 @@ public class ModelFileFormat
 
     private void ReadBones(BinaryReader reader)
     {
-        if ((header.flags & (byte)ModelFlags.MODEL_BONE) == 1)
-        {
             bones = new Bone[header.bone_count];
             for (int i = 0; i < header.bone_count; i++)
             {
@@ -316,7 +314,6 @@ public class ModelFileFormat
                 bones[i].parent = reader.ReadByte();
             }
         }
-    }
 
     private void ReadMaterials(BinaryReader reader)
     {
