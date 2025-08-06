@@ -201,8 +201,6 @@ public class Mesh
 
     public object[] Vertecies;
     public ushort[] Indices;
-
-
 }
 
 public class ModelFileFormat
@@ -216,7 +214,7 @@ public class ModelFileFormat
     public Mesh[] meshes;
     public byte[] stringTable;
 
-    public List<AnimationData> Animations = new();
+    public AnimationData[] Animations;
     public Animation[] AllAnimationTransforms; // All unique transforms for all animations
 
     public CollisionHeader? collisionHeader;
@@ -368,17 +366,16 @@ public class ModelFileFormat
 
     private void ReadAnimations(BinaryReader reader)
     {
+        Animations = new AnimationData[header.anim_file_count];
         // Read animation headers, keyframes, and the index map
         for (int i = 0; i < header.anim_file_count; i++)
         {
-            var animData = new AnimationData();
-
             var animHeader = new AnimationHeader
             {
                 szoption = reader.ReadUInt32(),
                 keyframe_count = reader.ReadUInt16()
             };
-            animData.Header = animHeader;
+            Animations[i].Header = animHeader;
 
             var frames = new Keyframe[animHeader.keyframe_count];
             for (int j = 0; j < animHeader.keyframe_count; j++)
@@ -386,19 +383,17 @@ public class ModelFileFormat
                 frames[j].time = reader.ReadUInt16();
                 frames[j].option = reader.ReadUInt32();
             }
-            animData.Keyframes = frames;
+            Animations[i].Keyframes = frames;
 
-            animData.BoneTransformIndices = new ushort[animHeader.keyframe_count, header.bone_count];
+            Animations[i].BoneTransformIndices = new ushort[animHeader.keyframe_count, header.bone_count];
             for (int j = 0; j < animHeader.keyframe_count; j++)
             {
                 for (int k = 0; k < header.bone_count; k++)
                 {
                     // This is the critical part that was missing
-                    animData.BoneTransformIndices[j, k] = reader.ReadUInt16();
+                    Animations[i].BoneTransformIndices[j, k] = reader.ReadUInt16();
                 }
             }
-
-            Animations.Add(animData);
         }
 
         // Now, read the global array of all unique animation transforms
@@ -415,19 +410,15 @@ public class ModelFileFormat
 
     private void ReadAnimationNameOffsets(BinaryReader reader)
     {
-        int count = (int)header.anim_file_count;
+        animationNameOffsets = new uint[header.anim_file_count];
+        animationNames = new string[header.anim_file_count];
 
-        // This part can remain if you need it, but we'll also assign names to our AnimationData
-        animationNameOffsets = new uint[count];
-        animationNames = new string[count];
-
-        for (int i = 0; i < count; i++)
+        for (int i = 0; i < header.anim_file_count; i++)
         {
             animationNameOffsets[i] = reader.ReadUInt32();
             animationNames[i] = GetString(animationNameOffsets[i]);
 
-            // Assign the name to the corresponding animation
-            if (i < Animations.Count)
+            if (i < Animations.Length)
             {
                 Animations[i].Name = animationNames[i];
             }
@@ -530,7 +521,7 @@ public class ModelFileFormat
 
 }
 
-public class AnimationData
+public struct AnimationData
 {
     public AnimationHeader Header { get; set; }
     public Keyframe[] Keyframes { get; set; }

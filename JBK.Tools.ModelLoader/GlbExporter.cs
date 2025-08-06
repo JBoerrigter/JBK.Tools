@@ -229,7 +229,7 @@ public class GlbExporter
                     result.Add(new VertexBuilder<VertexPositionNormal, VertexTexture1, VertexJoints4>(
                         new VertexPositionNormal(v.Position, v.Normal),
                         new VertexTexture1(v.TexCoord),
-                        new VertexEmpty()
+                        new VertexJoints4()
                     ));
                 }
                 VertexRigid rigid = (VertexRigid)vertices[0];
