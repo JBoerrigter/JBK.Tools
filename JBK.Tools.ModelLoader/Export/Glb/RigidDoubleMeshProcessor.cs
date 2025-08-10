@@ -11,7 +11,7 @@ public class RigidDoubleMeshProcessor : IMeshProcessor
 {
     public IMeshBuilder<MaterialBuilder> Process(IIndexProcessor indexProcessor, MaterialBuilder material, Mesh mesh)
     {
-        var meshBuilder = new MeshBuilder<VertexPositionNormal, VertexTexture1, VertexEmpty>($"Mesh_{mesh.Header.name}");
+        var meshBuilder = new MeshBuilder<VertexPositionNormal, VertexTexture2, VertexEmpty>($"Mesh_{mesh.Header.name}");
         var primitive = meshBuilder.UsePrimitive(material);
 
         var vertices = GetVertexBuilders(mesh.Vertecies.OfType<VertexRigidDouble>().ToArray());
@@ -37,9 +37,11 @@ public class RigidDoubleMeshProcessor : IMeshProcessor
         IVertexBuilder[] vertexBuilders = new IVertexBuilder[vertices.Length];
         for (int i = 0; i < vertices.Length; i++)
         {
-            vertexBuilders[i] = new VertexBuilder<VertexPositionNormal, VertexTexture1, VertexEmpty>(
+            var uv0 = vertices[i].TexCoord0;
+            var uv1 = vertices[i].TexCoord1;
+            vertexBuilders[i] = new VertexBuilder<VertexPositionNormal, VertexTexture2, VertexEmpty>(
                 new VertexPositionNormal(vertices[i].Position, vertices[i].Normal),
-                new VertexTexture1(vertices[i].TexCoord0),
+                new VertexTexture2(new Vector2(uv0.X, uv0.Y), new Vector2(uv1.X, uv1.Y)),
                 new VertexEmpty());
         }
         return vertexBuilders;
