@@ -2,5 +2,5 @@
 
 public interface IExporter
 {
-    void Export(ModelFileFormat.ModelFileFormat source, string outputPath);
+    void Export(ModelFileFormat.ModelFileFormat source, string texPath, string outputPath);
 }

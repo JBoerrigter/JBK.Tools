@@ -5,14 +5,16 @@ using JBK.Tools.ModelLoader.Export.Glb;
 string fileName;
 fileName = @"D:\ObjTest\[ae]w_mill_house.gb";
 fileName = @"D:\ObjTest\[a]b_ship01.gb";
-//fileName = @"D:\ObjTest\P001_b2.gb"; 
+fileName = @"D:\ObjTest\w_mill01.gb"; 
 
 ModelFileFormat fileFormat = new ModelFileFormat();
 fileFormat.Read(fileName);
 
+string texPath = @"D:\ObjTest\tex";
+
 string exportPath = "C:\\Users\\Jascha\\Desktop\\test.glb";
 IExporter exporter = new GlbExporter();
-exporter.Export(fileFormat, exportPath);
+exporter.Export(fileFormat, texPath, exportPath);
 
 
 //void Decode(byte key, byte[] output, byte[] input, int length)
