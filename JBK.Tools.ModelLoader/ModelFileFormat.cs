@@ -13,8 +13,8 @@ public struct Header
     public byte flags;
     public byte mesh_count;
     public uint crc;
-    
-    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 64)] 
+
+    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 64)]
     public byte[] name;
 
     public uint szoption;
@@ -106,7 +106,7 @@ public struct CollisionNode
 }
 
 [StructLayout(LayoutKind.Sequential, Pack = 1)]
-public struct VertexRigid 
+public struct VertexRigid
 {
     public Vector3 Position;     // D3DXVECTOR3 v
     public Vector3 Normal;       // D3DXVECTOR3 n
@@ -136,7 +136,7 @@ public struct VertexBlend2
 
 
 [StructLayout(LayoutKind.Sequential, Pack = 1)]
-public struct VertexBlend3 
+public struct VertexBlend3
 {
     public Vector3 Position;     // D3DXVECTOR3 v
     public float BlendWeight0;   // FLOAT blend[0]
@@ -156,15 +156,15 @@ public struct VertexBlend3
 
 
 [StructLayout(LayoutKind.Sequential, Pack = 1)]
-public struct VertexBlend4 
+public struct VertexBlend4
 {
-    public Vector3 Position;     // D3DXVECTOR3 v
-    public float BlendWeight0;   // FLOAT blend[0]
-    public float BlendWeight1;   // FLOAT blend[1]
-    public float BlendWeight2;   // FLOAT blend[2]
-    public uint BoneIndices;     // DWORD indices
-    public Vector3 Normal;       // D3DXVECTOR3 n
-    public Vector2 TexCoord;     // D3DXVECTOR2 t
+    public Vector3 Position;
+    public float BlendWeight0;
+    public float BlendWeight1;
+    public float BlendWeight2;
+    public uint BoneIndices;
+    public Vector3 Normal;
+    public Vector2 TexCoord;
 
     public float GetBlendWeight3()
     {
@@ -179,10 +179,10 @@ public struct VertexBlend4
 [StructLayout(LayoutKind.Sequential, Pack = 1)]
 public struct VertexRigidDouble
 {
-    public Vector3 Position;     // D3DXVECTOR3 v
-    public Vector3 Normal;       // D3DXVECTOR3 n
-    public Vector2 TexCoord0;    // D3DXVECTOR2 t0
-    public Vector2 TexCoord1;    // D3DXVECTOR2 t1 (e.g., lightmap UVs)
+    public Vector3 Position;
+    public Vector3 Normal;
+    public Vector2 TexCoord0;
+    public Vector2 TexCoord1;
 }
 
 
@@ -221,6 +221,7 @@ public class ModelFileFormat
     public CollisionNode[] collisionNodes;
     public uint[] animationNameOffsets;
     public string[] animationNames;
+    public MaterialFrame[][] materialFramesByMaterial; // [materialIndex][frameIndex]
 
     public void Read(string fileName)
     {
@@ -237,9 +238,9 @@ public class ModelFileFormat
             ReadCollisionData(reader);     // collision header + nodes
 
         ReadStringTable(reader);           // string_size
-        //ReadAnimationNameOffsets(reader); // Get names after string table is read
+        ParseMaterialFramesFromStringTable();
     }
-
+    
     private void ReadHeader(BinaryReader reader)
     {
         header.version = reader.ReadByte();
@@ -290,28 +291,28 @@ public class ModelFileFormat
 
     private void ReadBones(BinaryReader reader)
     {
-            bones = new Bone[header.bone_count];
-            for (int i = 0; i < header.bone_count; i++)
-            {
-                bones[i].matrix.M11 = reader.ReadSingle();
-                bones[i].matrix.M12 = reader.ReadSingle();
-                bones[i].matrix.M13 = reader.ReadSingle();
-                bones[i].matrix.M14 = reader.ReadSingle();
-                bones[i].matrix.M21 = reader.ReadSingle();
-                bones[i].matrix.M22 = reader.ReadSingle();
-                bones[i].matrix.M23 = reader.ReadSingle();
-                bones[i].matrix.M24 = reader.ReadSingle();
-                bones[i].matrix.M31 = reader.ReadSingle();
-                bones[i].matrix.M32 = reader.ReadSingle();
-                bones[i].matrix.M33 = reader.ReadSingle();
-                bones[i].matrix.M34 = reader.ReadSingle();
-                bones[i].matrix.M41 = reader.ReadSingle();
-                bones[i].matrix.M42 = reader.ReadSingle();
-                bones[i].matrix.M43 = reader.ReadSingle();
-                bones[i].matrix.M44 = reader.ReadSingle();
-                bones[i].parent = reader.ReadByte();
-            }
+        bones = new Bone[header.bone_count];
+        for (int i = 0; i < header.bone_count; i++)
+        {
+            bones[i].matrix.M11 = reader.ReadSingle();
+            bones[i].matrix.M12 = reader.ReadSingle();
+            bones[i].matrix.M13 = reader.ReadSingle();
+            bones[i].matrix.M14 = reader.ReadSingle();
+            bones[i].matrix.M21 = reader.ReadSingle();
+            bones[i].matrix.M22 = reader.ReadSingle();
+            bones[i].matrix.M23 = reader.ReadSingle();
+            bones[i].matrix.M24 = reader.ReadSingle();
+            bones[i].matrix.M31 = reader.ReadSingle();
+            bones[i].matrix.M32 = reader.ReadSingle();
+            bones[i].matrix.M33 = reader.ReadSingle();
+            bones[i].matrix.M34 = reader.ReadSingle();
+            bones[i].matrix.M41 = reader.ReadSingle();
+            bones[i].matrix.M42 = reader.ReadSingle();
+            bones[i].matrix.M43 = reader.ReadSingle();
+            bones[i].matrix.M44 = reader.ReadSingle();
+            bones[i].parent = reader.ReadByte();
         }
+    }
 
     private void ReadMaterials(BinaryReader reader)
     {
@@ -323,20 +324,6 @@ public class ModelFileFormat
             materialData[i].szoption = reader.ReadUInt32();
             materialData[i].m_power = reader.ReadSingle();
             materialData[i].m_frame = reader.ReadUInt32();
-        }
-    }
-
-    private void ReadMaterialFrames(BinaryReader reader)
-    {
-        materialFrames = new MaterialFrame[header.material_frame_count];
-        for (int i = 0; i < materialFrames.Length; i++)
-        {
-            materialFrames[i].m_ambient = reader.ReadUInt32();
-            materialFrames[i].m_diffuse = reader.ReadUInt32();
-            materialFrames[i].m_specular = reader.ReadUInt32();
-            materialFrames[i].m_opacity = reader.ReadSingle();
-            materialFrames[i].m_offset = new Vector2(reader.ReadSingle(), reader.ReadSingle());
-            materialFrames[i].m_angle = new Vector3(reader.ReadSingle(), reader.ReadSingle(), reader.ReadSingle());
         }
     }
 
@@ -398,7 +385,7 @@ public class ModelFileFormat
 
         // Now, read the global array of all unique animation transforms
         // The header.anim_count stores the total number of these transforms
-        int totalTransforms = (int)header.anim_count;
+        int totalTransforms = header.anim_count;
         AllAnimationTransforms = new Animation[totalTransforms];
         for (int i = 0; i < totalTransforms; i++)
         {
@@ -472,6 +459,59 @@ public class ModelFileFormat
         stringTable = reader.ReadBytes((int)header.string_size);
     }
 
+    private void ParseMaterialFramesFromStringTable()
+    {
+        if (materialData == null || stringTable == null || header.material_frame_count == 0)
+        {
+            materialFramesByMaterial = Array.Empty<MaterialFrame[]>();
+            return;
+        }
+
+        int framesPerMaterial = header.material_frame_count;
+        int perFrameSize = (/* 3 DWORD colors */ 4 * 3) + /* opacity */ 4 + /* vec2 */ (4 * 2) + /* vec3 */ (4 * 3);
+        materialFramesByMaterial = new MaterialFrame[materialData.Length][];
+
+        using var ms = new MemoryStream(stringTable);
+        using var br = new BinaryReader(ms, Encoding.ASCII, leaveOpen: true);
+
+        for (int matIndex = 0; matIndex < materialData.Length; matIndex++)
+        {
+            uint frameOffset = materialData[matIndex].m_frame;
+            if (frameOffset == 0 || frameOffset >= stringTable.Length)
+            {
+                // No frames or invalid offset — leave empty
+                materialFramesByMaterial[matIndex] = Array.Empty<MaterialFrame>();
+                continue;
+            }
+
+            long start = frameOffset;
+            long needed = (long)framesPerMaterial * perFrameSize;
+            if (start + needed > stringTable.Length)
+            {
+                materialFramesByMaterial[matIndex] = Array.Empty<MaterialFrame>();
+                continue;
+            }
+
+            ms.Position = start;
+            var frames = new MaterialFrame[framesPerMaterial];
+            for (int f = 0; f < framesPerMaterial; f++)
+            {
+                frames[f].m_ambient = br.ReadUInt32();
+                frames[f].m_diffuse = br.ReadUInt32();
+                frames[f].m_specular = br.ReadUInt32();
+                frames[f].m_opacity = br.ReadSingle();
+                float ox = br.ReadSingle();
+                float oy = br.ReadSingle();
+                frames[f].m_offset = new Vector2(ox, oy);
+                float ax = br.ReadSingle();
+                float ay = br.ReadSingle();
+                float az = br.ReadSingle();
+                frames[f].m_angle = new Vector3(ax, ay, az);
+            }
+
+            materialFramesByMaterial[matIndex] = frames;
+        }
+    }
 
     int GetVertexSize(VertexType vertexType)
     {
@@ -487,7 +527,7 @@ public class ModelFileFormat
         };
     }
 
-    IEnumerable GetVertexData(VertexType vertexType, byte[] buffer) 
+    IEnumerable GetVertexData(VertexType vertexType, byte[] buffer)
     {
         return vertexType switch
         {
