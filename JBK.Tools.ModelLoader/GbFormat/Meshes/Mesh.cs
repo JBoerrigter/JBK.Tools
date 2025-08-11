@@ -1,6 +1,4 @@
-﻿using JBK.Tools.ModelLoader.GbFormat.Meshes;
-
-namespace JBK.Tools.ModelFileFormat;
+﻿namespace JBK.Tools.ModelLoader.GbFormat.Meshes;
 
 public class Mesh
 {
