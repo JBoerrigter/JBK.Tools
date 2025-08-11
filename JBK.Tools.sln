@@ -5,13 +5,9 @@ VisualStudioVersion = 17.7.34202.233
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "JBK.Tools.MapExtractor", "JBK.Tools.MapExtractor\JBK.Tools.MapExtractor.csproj", "{4AAAC7E6-6E88-4CB9-A2B8-CB859E372DB5}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "JBK.Tools.ModelConverter", "JBK.Tools.ModelConverter\JBK.Tools.ModelConverter.csproj", "{43CAB745-2CBB-4797-9778-54CCE42AC6F9}"
-EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JBK.Tools.OplReader", "JBK.Tools.OplReader\JBK.Tools.OplReader.csproj", "{8E73D00E-593E-48EC-AACC-AEBB2277C715}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JBK.Tools.ModelLoader", "JBK.Tools.ModelLoader\JBK.Tools.ModelLoader.csproj", "{6AADB074-6704-489C-81C3-313203A3E79F}"
-EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "JBK.Tools.ModelViewer", "JBK.Tools.ModelViewer\JBK.Tools.ModelViewer.csproj", "{95324927-DBBD-4E67-A12A-2B9148EAC755}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -29,14 +25,6 @@ Global
 		{4AAAC7E6-6E88-4CB9-A2B8-CB859E372DB5}.Release|Any CPU.Build.0 = Release|Any CPU
 		{4AAAC7E6-6E88-4CB9-A2B8-CB859E372DB5}.Release|x64.ActiveCfg = Release|Any CPU
 		{4AAAC7E6-6E88-4CB9-A2B8-CB859E372DB5}.Release|x64.Build.0 = Release|Any CPU
-		{43CAB745-2CBB-4797-9778-54CCE42AC6F9}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{43CAB745-2CBB-4797-9778-54CCE42AC6F9}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{43CAB745-2CBB-4797-9778-54CCE42AC6F9}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{43CAB745-2CBB-4797-9778-54CCE42AC6F9}.Debug|x64.Build.0 = Debug|Any CPU
-		{43CAB745-2CBB-4797-9778-54CCE42AC6F9}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{43CAB745-2CBB-4797-9778-54CCE42AC6F9}.Release|Any CPU.Build.0 = Release|Any CPU
-		{43CAB745-2CBB-4797-9778-54CCE42AC6F9}.Release|x64.ActiveCfg = Release|Any CPU
-		{43CAB745-2CBB-4797-9778-54CCE42AC6F9}.Release|x64.Build.0 = Release|Any CPU
 		{8E73D00E-593E-48EC-AACC-AEBB2277C715}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
 		{8E73D00E-593E-48EC-AACC-AEBB2277C715}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{8E73D00E-593E-48EC-AACC-AEBB2277C715}.Debug|x64.ActiveCfg = Debug|Any CPU
@@ -53,14 +41,6 @@ Global
 		{6AADB074-6704-489C-81C3-313203A3E79F}.Release|Any CPU.Build.0 = Release|Any CPU
 		{6AADB074-6704-489C-81C3-313203A3E79F}.Release|x64.ActiveCfg = Release|Any CPU
 		{6AADB074-6704-489C-81C3-313203A3E79F}.Release|x64.Build.0 = Release|Any CPU
-		{95324927-DBBD-4E67-A12A-2B9148EAC755}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
-		{95324927-DBBD-4E67-A12A-2B9148EAC755}.Debug|Any CPU.Build.0 = Debug|Any CPU
-		{95324927-DBBD-4E67-A12A-2B9148EAC755}.Debug|x64.ActiveCfg = Debug|Any CPU
-		{95324927-DBBD-4E67-A12A-2B9148EAC755}.Debug|x64.Build.0 = Debug|Any CPU
-		{95324927-DBBD-4E67-A12A-2B9148EAC755}.Release|Any CPU.ActiveCfg = Release|Any CPU
-		{95324927-DBBD-4E67-A12A-2B9148EAC755}.Release|Any CPU.Build.0 = Release|Any CPU
-		{95324927-DBBD-4E67-A12A-2B9148EAC755}.Release|x64.ActiveCfg = Release|Any CPU
-		{95324927-DBBD-4E67-A12A-2B9148EAC755}.Release|x64.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE

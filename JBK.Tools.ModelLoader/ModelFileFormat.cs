@@ -1,4 +1,10 @@
 ﻿using JBK.Tools.ModelLoader.Enums;
+using JBK.Tools.ModelLoader.GbFormat;
+using JBK.Tools.ModelLoader.GbFormat.Animations;
+using JBK.Tools.ModelLoader.GbFormat.Bones;
+using JBK.Tools.ModelLoader.GbFormat.Collisions;
+using JBK.Tools.ModelLoader.GbFormat.Materials;
+using JBK.Tools.ModelLoader.GbFormat.Meshes;
 using System.Collections;
 using System.Numerics;
 using System.Runtime.InteropServices;
@@ -6,202 +12,156 @@ using System.Text;
 
 namespace JBK.Tools.ModelFileFormat;
 
-public struct Header
-{
-    public byte version;
-    public byte bone_count;
-    public byte flags;
-    public byte mesh_count;
-    public uint crc;
+//// NormalizedHeader.cs
+//public record NormalizedHeader
+//{
+//    public byte Version { get; init; }
+//    public byte BoneCount { get; init; }
+//    public byte Flags { get; init; }
+//    public byte MeshCount { get; init; }
+//    public uint SzOption { get; init; }
+//    public int[] VertexCounts { get; init; } = new int[12]; // canonical 12 slots
+//    public uint IndexCount { get; init; }
+//    public uint BoneIndexCount { get; init; }
+//    public uint KeyframeCount { get; init; }
+//    public uint StringSize { get; init; }    // always 32-bit in canonical model
+//    public uint ClsSize { get; init; }       // canonical
+//    public uint AnimCount { get; init; }
+//    public byte AnimFileCount { get; init; }
+//    public uint MaterialCount { get; init; }
+//    public uint MaterialFrameCount { get; init; }
+//}
 
-    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 64)]
-    public byte[] name;
+//// HeaderV8.cs -- reads v8 fields and converts to NormalizedHeader
+//public record HeaderV8
+//{
+//    public byte Version;
+//    public byte BoneCount;
+//    public byte Flags;
+//    public byte MeshCount;
+//    public uint SzOption;
+//    public ushort[] VertexCount = new ushort[6]; // v8 had 6 entries
+//    public ushort IndexCount;
+//    public ushort BoneIndexCount;
+//    public ushort KeyframeCount;
+//    public ushort StringCount;
+//    public ushort StringSize; // v8 uses 16-bit
+//    public ushort ClsSize;    // v8 uses 16-bit
+//    public ushort AnimCount;
+//    public byte AnimFileCount;
+//    public ushort MaterialCount;
+//    public ushort MaterialFrameCount;
 
-    public uint szoption;
-    public ushort[] vertex_count; // 12 elements
-    public ushort index_count;
-    public ushort bone_index_count;
-    public ushort keyframe_count;
-    public ushort reserved0;
-    public uint string_size;
-    public uint cls_size;
-    public ushort anim_count;
-    public byte anim_file_count;
-    public byte reserved1;
-    public ushort material_count;
-    public ushort material_frame_count;
-    public float[] minimum; // 3 elements
-    public float[] maximum; // 3 elements
+//    public static HeaderV8 ReadFrom(BinaryReader br)
+//    {
+//        var h = new HeaderV8();
+//        h.Version = br.ReadByte();
+//        h.BoneCount = br.ReadByte();
+//        h.Flags = br.ReadByte();
+//        h.MeshCount = br.ReadByte();
+//        h.SzOption = br.ReadUInt32();
+//        for (int i = 0; i < 6; i++) h.VertexCount[i] = br.ReadUInt16();
+//        h.IndexCount = br.ReadUInt16();
+//        h.BoneIndexCount = br.ReadUInt16();
+//        h.KeyframeCount = br.ReadUInt16();
+//        h.StringCount = br.ReadUInt16();
+//        h.StringSize = br.ReadUInt16();
+//        h.ClsSize = br.ReadUInt16();
+//        h.AnimCount = br.ReadUInt16();
+//        h.AnimFileCount = br.ReadByte();
+//        h.MaterialCount = br.ReadUInt16();
+//        h.MaterialFrameCount = br.ReadUInt16();
+//        return h;
+//    }
 
-    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 4)]
-    public uint[] Reserved2;         // DWORD reserved2[4];
-}
+//    public NormalizedHeader ToNormalized()
+//    {
+//        var n = new NormalizedHeader
+//        {
+//            Version = Version,
+//            BoneCount = BoneCount,
+//            Flags = Flags,
+//            MeshCount = MeshCount,
+//            SzOption = SzOption,
+//            IndexCount = IndexCount,
+//            BoneIndexCount = BoneIndexCount,
+//            KeyframeCount = KeyframeCount,
+//            StringSize = StringSize,   // promote ushort -> uint implicitly
+//            ClsSize = ClsSize,
+//            AnimCount = AnimCount,
+//            AnimFileCount = AnimFileCount,
+//            MaterialCount = MaterialCount,
+//            MaterialFrameCount = MaterialFrameCount
+//        };
+//        for (int i = 0; i < 6; i++) n.VertexCounts[i] = VertexCount[i];
+//        // remaining VertexCounts already zero-initialized
+//        return n;
+//    }
+//}
 
-public struct Bone
-{
-    public Matrix4x4 matrix;
-    public byte parent;
-}
+//// IModelFormatReader.cs
+//public interface IModelFormatReader
+//{
+//    NormalizedHeader ReadHeader();
+//    Model ReadModel(); // Model is your in-memory result type
+//}
 
-public struct MeshHeader
-{
-    public uint name;
-    public int material_ref;
-    public byte vertex_type;
-    public byte face_type;
-    public ushort vertex_count;
-    public ushort index_count;
-    public byte bone_index_count;
-}
+//// V8ModelReader.cs
+//public class V8ModelReader : IModelFormatReader
+//{
+//    private readonly BinaryReader _BinaryReader;
+//    public V8ModelReader(BinaryReader binaryReader) => _BinaryReader = binaryReader;
 
-public struct AnimationHeader
-{
-    public uint szoption;
-    public ushort keyframe_count;
-}
+//    public NormalizedHeader ReadHeader()
+//    {
+//        var h8 = HeaderV8.ReadFrom(_BinaryReader);
+//        var normalized = h8.ToNormalized();
+//        // optional: validate normalized values here (simple sanity checks)
+//        ValidateHeader(normalized);
+//        return normalized;
+//    }
 
-public struct Keyframe
-{
-    public ushort time;
-    public uint option;
-}
+//    public Model ReadModel()
+//    {
+//        var header = ReadHeader();
+//        // call into shared parsing code that consumes the rest using header
+//        return SharedModelParser.Parse(header, _BinaryReader);
+//    }
 
-public struct MaterialKey
-{
-    public uint szTexture;
-    public ushort mapoption;
-    public uint szoption;
-    public float m_power;
-    public uint m_frame;
-}
+//    private void ValidateHeader(NormalizedHeader h)
+//    {
+//        if (h.StringSize > 100_000_000) // arbitrary sanity bound
+//            throw new ModelFormatException("string table size unreasonable");
+//    }
+//}
 
-public struct MaterialFrame
-{
-    public uint m_ambient; // ARGB packed color
-    public uint m_diffuse; // ARGB packed color
-    public uint m_specular; // ARGB packed color
-    public float m_opacity;
-    public Vector2 m_offset;
-    public Vector3 m_angle;
-}
+//// ReaderFactory + Loader orchestration
+//public static class ModelReaderFactory
+//{
+//    public static IModelFormatReader Create(byte version, BinaryReader br) => version switch
+//    {
+//        8 => new V8ModelReader(br),
+//        12 => new V12ModelReader(br),
+//        >= 9 => new LegacyModelReader(br),
+//        _ => throw new NotSupportedException($"Model version {version} not supported")
+//    };
+//}
 
-public struct CollisionHeader
-{
-    public ushort vertex_count;
-    public ushort face_count;
-    public uint[] reserved; // 6 elements
-}
-
-public struct CollisionNode
-{
-    public ushort flag;
-    public byte x_min;
-    public byte y_min;
-    public byte z_min;
-    public byte x_max;
-    public byte y_max;
-    public byte z_max;
-    public ushort left;
-    public ushort right;
-}
-
-[StructLayout(LayoutKind.Sequential, Pack = 1)]
-public struct VertexRigid
-{
-    public Vector3 Position;     // D3DXVECTOR3 v
-    public Vector3 Normal;       // D3DXVECTOR3 n
-    public Vector2 TexCoord;     // D3DXVECTOR2 t
-}
-
-
-[StructLayout(LayoutKind.Sequential, Pack = 1)]
-public struct VertexBlend1
-{
-    public Vector3 Position;     // D3DXVECTOR3 v
-    public uint BoneIndices;     // DWORD indices (packed as 4 bytes, usually only 1 used)
-    public Vector3 Normal;       // D3DXVECTOR3 n
-    public Vector2 TexCoord;     // D3DXVECTOR2 t
-}
-
-
-[StructLayout(LayoutKind.Sequential, Pack = 1)]
-public struct VertexBlend2
-{
-    public Vector3 Position;     // D3DXVECTOR3 v
-    public float BlendWeight0;   // FLOAT blend[0]
-    public uint BoneIndices;     // DWORD indices
-    public Vector3 Normal;       // D3DXVECTOR3 n
-    public Vector2 TexCoord;     // D3DXVECTOR2 t
-}
-
-
-[StructLayout(LayoutKind.Sequential, Pack = 1)]
-public struct VertexBlend3
-{
-    public Vector3 Position;     // D3DXVECTOR3 v
-    public float BlendWeight0;   // FLOAT blend[0]
-    public float BlendWeight1;   // FLOAT blend[1]
-    public uint BoneIndices;     // DWORD indices
-    public Vector3 Normal;       // D3DXVECTOR3 n
-    public Vector2 TexCoord;     // D3DXVECTOR2 t
-
-    public float GetBlendWeight2()
-    {
-        float weight = 1.0f;
-        float calculatedWeight = BlendWeight0 + BlendWeight1;
-        calculatedWeight = Math.Clamp(calculatedWeight, 0.0f, 1.0f);
-        return weight - calculatedWeight;
-    }
-}
-
-
-[StructLayout(LayoutKind.Sequential, Pack = 1)]
-public struct VertexBlend4
-{
-    public Vector3 Position;
-    public float BlendWeight0;
-    public float BlendWeight1;
-    public float BlendWeight2;
-    public uint BoneIndices;
-    public Vector3 Normal;
-    public Vector2 TexCoord;
-
-    public float GetBlendWeight3()
-    {
-        float weight = 1.0f;
-        float calculatedWeight = BlendWeight0 + BlendWeight1 + BlendWeight2;
-        calculatedWeight = Math.Clamp(calculatedWeight, 0.0f, 1.0f);
-        return weight - calculatedWeight;
-    }
-}
+//public static class ModelLoader
+//{
+//    public static Model LoadFromFile(string path)
+//    {
+//        using var fs = File.OpenRead(path);
+//        using var br = new BinaryReader(fs, Encoding.UTF8, leaveOpen: true);
+//        // read first byte to detect version, then rewind to allow reader to read header from start
+//        byte version = br.ReadByte();
+//        fs.Seek(0, SeekOrigin.Begin);
+//        var reader = ModelReaderFactory.Create(version, br);
+//        return reader.ReadModel();
+//    }
+//}
 
 
-[StructLayout(LayoutKind.Sequential, Pack = 1)]
-public struct VertexRigidDouble
-{
-    public Vector3 Position;
-    public Vector3 Normal;
-    public Vector2 TexCoord0;
-    public Vector2 TexCoord1;
-}
-
-
-public struct Animation
-{
-    public Vector3 pos;
-    public Quaternion quat;
-    public Vector3 scale;
-}
-
-public class Mesh
-{
-    public MeshHeader Header;
-    public byte[] BoneIndices;
-    public byte[] VertexBuffer;
-
-    public object[] Vertecies;
-    public ushort[] Indices;
-}
 
 public class ModelFileFormat
 {
@@ -559,14 +519,4 @@ public class ModelFileFormat
         return result;
     }
 
-}
-
-public struct AnimationData
-{
-    public AnimationHeader Header { get; set; }
-    public Keyframe[] Keyframes { get; set; }
-
-    // Stores [keyframeIndex, boneIndex] -> transformIndex
-    public ushort[,] BoneTransformIndices { get; set; }
-    public string Name { get; set; }
 }

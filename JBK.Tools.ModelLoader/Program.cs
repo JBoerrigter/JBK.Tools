@@ -5,18 +5,20 @@ using JBK.Tools.ModelLoader.Export.Glb;
 Console.WriteLine("=== GB to GLB Converter ===");
 Console.WriteLine();
 Console.WriteLine("Enter directory to convert: ");
-string? inputPath = Console.ReadLine()?.Trim();
+//string? inputPath = Console.ReadLine()?.Trim();
+string? inputPath = @"C:\Users\Jascha\Desktop\t";
 if (string.IsNullOrEmpty(inputPath)) return;
 
 string outputPath = Path.Combine(inputPath, "Converted");
 Directory.CreateDirectory(outputPath);
 
 string outputFile;
-ModelFileFormat fileFormat;
+ModelFileFormat? fileFormat;
 IExporter exporter = new GlbExporter();
 
 foreach (string fileName in Directory.GetFiles(inputPath, "*.gb"))
 {
+    fileFormat = null;
     try
     {
         fileFormat = new ModelFileFormat();
@@ -33,7 +35,14 @@ foreach (string fileName in Directory.GetFiles(inputPath, "*.gb"))
     }
     catch (Exception ex)
     {
-        Console.WriteLine(ex.Message);
+        if (fileFormat != null)
+        {
+            Console.WriteLine("Header: {0} - Exception: {1}", fileFormat.header.version, ex.Message);
+        }
+        else
+        {
+            Console.WriteLine(ex.Message);
+        }
     }
 }
 

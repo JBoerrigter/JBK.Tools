@@ -1,9 +1,9 @@
 ﻿using System.Globalization;
 using System.Numerics;
 
-namespace JBK.Tools.ModelConverter.Exporter;
+namespace JBK.Tools.ModelLoader.Export.Obj;
 
-public class OBJExporter
+public class OBJExporter : IExporter
 {
     public static void ExportToObj(string filePath, List<Vector3> vertices, List<Vector2> textureCoords, List<Vector3> normals, List<int[]> faces)
     {
@@ -34,5 +34,10 @@ public class OBJExporter
             }
             writer.WriteLine();
         }
+    }
+
+    public void Export(ModelFileFormat.ModelFileFormat source, string texPath, string outputPath)
+    {
+        throw new NotImplementedException("OBJ export is not implemented yet.");
     }
 }

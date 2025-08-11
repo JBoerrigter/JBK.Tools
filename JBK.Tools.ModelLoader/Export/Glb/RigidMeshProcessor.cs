@@ -1,4 +1,5 @@
 ﻿using JBK.Tools.ModelFileFormat;
+using JBK.Tools.ModelLoader.GbFormat.Meshes;
 using SharpGLTF.Geometry;
 using SharpGLTF.Geometry.VertexTypes;
 using SharpGLTF.Materials;
