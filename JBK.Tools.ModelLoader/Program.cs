@@ -2,20 +2,38 @@
 using JBK.Tools.ModelLoader.Export;
 using JBK.Tools.ModelLoader.Export.Glb;
 
-string fileName;
-fileName = @"D:\ObjTest\[ae]w_mill_house.gb";
-fileName = @"D:\ObjTest\[a]b_ship01.gb";
-fileName = @"D:\ObjTest\w_mill01.gb"; 
 
-ModelFileFormat fileFormat = new ModelFileFormat();
-fileFormat.Read(fileName);
+string inputPath = @"D:\ObjTest\";
+string outputPath = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.Desktop), "Converted");
+Directory.CreateDirectory(outputPath);
 
-string texPath = @"D:\ObjTest\tex";
-
-string exportPath = "C:\\Users\\Jascha\\Desktop\\test.glb";
+string outputFile;
+ModelFileFormat fileFormat;
 IExporter exporter = new GlbExporter();
-exporter.Export(fileFormat, texPath, exportPath);
 
+foreach (string fileName in Directory.GetFiles(inputPath, "*.gb"))
+{
+    try
+    {
+        Console.WriteLine($"Processing file: {fileName}");
+
+        fileFormat = new ModelFileFormat();
+        fileFormat.Read(fileName);
+
+        outputFile = Path.GetFileName(fileName);
+        outputFile = Path.ChangeExtension(outputFile, ".glb");
+        outputFile = Path.Combine(outputPath, outputFile);
+
+        exporter.Export(
+            source: fileFormat,
+            texPath: Path.Combine(inputPath, "tex"),
+            outputPath: outputFile);
+    }
+    catch (Exception ex)
+    {
+        Console.WriteLine(ex.Message);
+    }
+}
 
 //void Decode(byte key, byte[] output, byte[] input, int length)
 //{

@@ -305,6 +305,13 @@ public class GlbExporter : IExporter
                 {
                     var baseName = parts[0];
                     var path = ResolveTexturePath(baseName, texturesFolder);
+
+                    var tmpPath = System.IO.Path.ChangeExtension(path, ".png"); // ensure .png extension if needed
+                    if (File.Exists(tmpPath))
+                    {
+                        path = tmpPath; // use .png if it exists
+                    }
+
                     if (!string.IsNullOrEmpty(path))
                     {
                         // base color / albedo texture
@@ -328,9 +335,6 @@ public class GlbExporter : IExporter
 
             result.Add(i, mb);
         }
-
-        return result;
-    }
 
         return result;
     }
