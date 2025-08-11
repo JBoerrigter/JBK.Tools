@@ -274,17 +274,33 @@ public class GlbExporter : IExporter
     private static Dictionary<int, MaterialBuilder> BuildMaterials(ModelFileFormat.ModelFileFormat sourceFile, string texturesFolder = null)
     {
         var result = new Dictionary<int, MaterialBuilder>();
+        var builders = new Dictionary<uint, MaterialBuilder>();
 
         if (sourceFile.materialData == null) return result;
 
         for (int i = 0; i < sourceFile.materialData.Length; i++)
         {
+            string texPacked = string.Empty;
             var mk = sourceFile.materialData[i];
-            // Create a readable name
+
+            if (mk.szTexture != 0 && builders.ContainsKey(mk.szTexture))
+            {
+                result.Add(i, builders[mk.szTexture]);
+                continue; // already processed this texture
+            }
+
+            // default name
             var matName = $"mat_{i}";
+
+            if (mk.szTexture != 0)
+            {
+                texPacked = sourceFile.GetString(mk.szTexture); // your model class has GetString(uint)
+                matName = Path.GetFileNameWithoutExtension(texPacked);
+            }
 
             // create builder and set base color from materialFrame (if present)
             MaterialBuilder mb = new MaterialBuilder(matName).WithDoubleSide(true).WithMetallicRoughnessShader();
+            builders.Add(mk.szTexture, mb);
 
             // map materialFrames (if exist)
             if (sourceFile.materialFrames != null && mk.m_frame < sourceFile.materialFrames.Length)
@@ -298,7 +314,6 @@ public class GlbExporter : IExporter
             // read textures (szTexture is an offset into the string table)
             if (mk.szTexture != 0)
             {
-                string texPacked = sourceFile.GetString(mk.szTexture); // your model class has GetString(uint)
                 var parts = SplitNullSeparatedStrings(texPacked);
 
                 if (parts.Length >= 1)
