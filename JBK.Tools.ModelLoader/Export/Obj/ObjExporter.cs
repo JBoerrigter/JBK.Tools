@@ -1,4 +1,5 @@
-﻿using System.Globalization;
+﻿using JBK.Tools.ModelLoader.FileReader;
+using System.Globalization;
 using System.Numerics;
 
 namespace JBK.Tools.ModelLoader.Export.Obj;
@@ -36,7 +37,7 @@ public class OBJExporter : IExporter
         }
     }
 
-    public void Export(ModelFileFormat.ModelFileFormat source, string texPath, string outputPath)
+    public void Export(Model source, string texPath, string outputPath)
     {
         throw new NotImplementedException("OBJ export is not implemented yet.");
     }

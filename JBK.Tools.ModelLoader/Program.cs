@@ -1,48 +1,39 @@
-﻿using JBK.Tools.ModelFileFormat;
+﻿using JBK.Tools.ModelLoader;
 using JBK.Tools.ModelLoader.Export;
 using JBK.Tools.ModelLoader.Export.Glb;
+using JBK.Tools.ModelLoader.FileReader;
 
 Console.WriteLine("=== GB to GLB Converter ===");
 Console.WriteLine();
 Console.WriteLine("Enter directory to convert: ");
-//string? inputPath = Console.ReadLine()?.Trim();
-string? inputPath = @"C:\Users\Jascha\Desktop\t";
+string? inputPath = Console.ReadLine()?.Trim();
+//inputPath = @"C:\Users\Jascha\Desktop\t";
 if (string.IsNullOrEmpty(inputPath)) return;
 
 string outputPath = Path.Combine(inputPath, "Converted");
 Directory.CreateDirectory(outputPath);
 
 string outputFile;
-ModelFileFormat? fileFormat;
 IExporter exporter = new GlbExporter();
 
 foreach (string fileName in Directory.GetFiles(inputPath, "*.gb"))
 {
-    fileFormat = null;
     try
     {
-        fileFormat = new ModelFileFormat();
-        fileFormat.Read(fileName);
+        Model model = GbFileLoader.LoadFromFile(fileName);
 
         outputFile = Path.GetFileName(fileName);
         outputFile = Path.ChangeExtension(outputFile, ".glb");
         outputFile = Path.Combine(outputPath, outputFile);
 
         exporter.Export(
-            source: fileFormat,
+            source: model,
             texPath: Path.Combine(inputPath, "tex"),
             outputPath: outputFile);
     }
     catch (Exception ex)
     {
-        if (fileFormat != null)
-        {
-            Console.WriteLine("Header: {0} - Exception: {1}", fileFormat.header.version, ex.Message);
-        }
-        else
-        {
-            Console.WriteLine(ex.Message);
-        }
+        Console.WriteLine(ex.Message);
     }
 }
 

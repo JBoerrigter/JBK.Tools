@@ -1,4 +1,5 @@
 ﻿using JBK.Tools.ModelLoader.Enums;
+using JBK.Tools.ModelLoader.FileReader;
 using SharpGLTF.Materials;
 using SharpGLTF.Scenes;
 using SharpGLTF.Transforms;
@@ -31,7 +32,7 @@ public class GlbExporter : IExporter
         };
     }
 
-    public void Export(ModelFileFormat.ModelFileFormat sourceFile, string texPath, string outputPath)
+    public void Export(Model sourceFile, string texPath, string outputPath)
     {
         var scene = new SceneBuilder();
         var defaultMaterial = CreateDefaultMaterial();
@@ -42,7 +43,7 @@ public class GlbExporter : IExporter
 
 
         // Bones
-        if (sourceFile.header.bone_count > 0)
+        if (sourceFile.header.BoneCount > 0)
         {
             var armature = new NodeBuilder("Armature");
             scene.AddNode(armature);
@@ -147,7 +148,7 @@ public class GlbExporter : IExporter
                 var animation = model.CreateAnimation(animName);
 
                 // For each bone, create its animation channels
-                for (int boneIndex = 0; boneIndex < sourceFile.header.bone_count; boneIndex++)
+                for (int boneIndex = 0; boneIndex < sourceFile.header.BoneCount; boneIndex++)
                 {
                     var targetNodeBuilder = boneNodes[boneIndex];
                     var targetNode = model.LogicalNodes.FirstOrDefault(n => n.Name == targetNodeBuilder.Name);
@@ -271,7 +272,7 @@ public class GlbExporter : IExporter
     }
 
     // Build MaterialBuilder objects from your sourceFile structures
-    private static Dictionary<int, MaterialBuilder> BuildMaterials(ModelFileFormat.ModelFileFormat sourceFile, string texturesFolder = null)
+    private static Dictionary<int, MaterialBuilder> BuildMaterials(Model sourceFile, string texturesFolder = null)
     {
         var result = new Dictionary<int, MaterialBuilder>();
         var builders = new Dictionary<uint, MaterialBuilder>();
