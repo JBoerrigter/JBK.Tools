@@ -25,8 +25,16 @@ public static class MeshParser
             model.meshes[i] = new Mesh();
             model.meshes[i].Header.name = reader.ReadUInt32();
             model.meshes[i].Header.material_ref = reader.ReadInt32();
-            model.meshes[i].Header.vertex_type = reader.ReadByte();
-            VertexParser parser = _VertexParsers[(VertexType)model.meshes[i].Header.vertex_type];
+
+            byte rawVertexType = reader.ReadByte();
+            // older files used a slightly different numbering
+            if (model.header.Version < 11 && rawVertexType > 0) rawVertexType -= 1;
+            model.meshes[i].Header.vertex_type = rawVertexType;
+            if (!Enum.IsDefined(typeof(VertexType), (int)rawVertexType))
+                throw new InvalidDataException($"Unknown vertex type {rawVertexType}");
+            VertexParser parser = _VertexParsers[(VertexType)rawVertexType];
+
+
             model.meshes[i].Header.face_type = reader.ReadByte();
             model.meshes[i].Header.vertex_count = reader.ReadUInt16();
             model.meshes[i].Header.index_count = reader.ReadUInt16();
