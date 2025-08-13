@@ -109,12 +109,42 @@ public class GlbExporter : IExporter
             var meshBuilder = meshProcessor.Process(indexProcessor, matForMesh, mesh);
 
             (NodeBuilder, Matrix4x4)[]? skin = null;
-            if (boneNodes != null)
+
+            if (boneNodes != null && boneNodes.Any())
             {
                 skin = new (NodeBuilder, Matrix4x4)[boneNodes.Length];
                 for (int i = 0; i < boneNodes.Length; i++)
-                {
                     skin[i] = (boneNodes[i], inverseBindMatrices[i]);
+            }
+            else
+            {
+                bool isSkinnedMesh =
+                    mesh.Header.vertex_type == (byte)VertexType.Blend1 ||
+                    mesh.Header.vertex_type == (byte)VertexType.Blend2 ||
+                    mesh.Header.vertex_type == (byte)VertexType.Blend3 ||
+                    mesh.Header.vertex_type == (byte)VertexType.Blend4;
+
+                if (isSkinnedMesh && mesh.BoneIndices != null && mesh.BoneIndices.Length > 0)
+                {
+                    // Reuse one dummy armature across meshes in the file
+                    var dummyArmature = new NodeBuilder("Armature_Dummy");
+                    scene.AddNode(dummyArmature);
+
+                    int maxGlobalBoneId = 0;
+                    foreach (var b in mesh.BoneIndices) if (b > maxGlobalBoneId) maxGlobalBoneId = b;
+
+                    // ensure we have nodes up to maxGlobalBoneId
+                    var dummyJoints = new List<NodeBuilder>();
+                    while (dummyJoints.Count <= maxGlobalBoneId)
+                    {
+                        var next = dummyArmature.CreateNode($"joint_{dummyJoints.Count:D3}");
+                        dummyJoints.Add(next);
+                    }
+
+                    // build the skin tuple array up to max used id
+                    skin = new (NodeBuilder, Matrix4x4)[maxGlobalBoneId + 1];
+                    for (int i = 0; i <= maxGlobalBoneId; i++)
+                        skin[i] = (dummyJoints[i], Matrix4x4.Identity);
                 }
             }
 
@@ -122,22 +152,6 @@ public class GlbExporter : IExporter
         }
 
         var model = scene.ToGltf2();
-
-        // fix Textures
-        //foreach (var mat in model.LogicalMaterials)
-        //{
-        //    // Access the low-level schema and set texture texCoord where needed
-        //    var schemaMat = mat; // model.LogicalMaterials contains Schema2.Material
-        //    if (schemaMat.PbrMetallicRoughness?.BaseColorTexture != null)
-        //        schemaMat.PbrMetallicRoughness.BaseColorTexture.TexCoord = 0;
-
-        //    if (schemaMat.EmissiveTexture != null)
-        //        schemaMat.EmissiveTexture.TexCoord = 0; // or 1 if you used second UV set
-
-        //    if (schemaMat.OcclusionTexture != null)
-        //        schemaMat.OcclusionTexture.TexCoord = 0; // change to 1 for secondary UVs
-        //}
-
 
         // Animations
         if (sourceFile.Animations.Any() && boneNodes != null)

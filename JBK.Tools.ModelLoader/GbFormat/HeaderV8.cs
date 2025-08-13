@@ -1,4 +1,6 @@
-﻿namespace JBK.Tools.ModelLoader.GbFormat;
+﻿using System.Runtime.InteropServices;
+
+namespace JBK.Tools.ModelLoader.GbFormat;
 
 public struct HeaderV8
 {
@@ -8,21 +10,20 @@ public struct HeaderV8
     public byte bone_count;
     public byte flags;
     public byte mesh_count;
-
-    // v8 doesn't include crc/name
     public uint szoption;
 
-    // v8 had 6 entries
-    public ushort[] vertex_count; // length 6
+    // v8 uses 6 vertex counts (older layout)
+    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 6)]
+    public ushort[] vertex_count;
+
     public ushort index_count;
     public ushort bone_index_count;
     public ushort keyframe_count;
 
     // v8 used smaller string fields
     public ushort string_count;
-    public ushort string_size; // 16-bit in v8
-    public ushort cls_size;    // 16-bit in v8
-
+    public ushort string_size;
+    public ushort cls_size;
     public ushort anim_count;
     public byte anim_file_count;
     public ushort material_count;
@@ -41,7 +42,6 @@ public struct HeaderV8
         header.bone_count = reader.ReadByte();
         header.flags = reader.ReadByte();
         header.mesh_count = reader.ReadByte();
-
         header.szoption = reader.ReadUInt32();
 
         header.vertex_count = new ushort[6];
@@ -50,11 +50,9 @@ public struct HeaderV8
         header.index_count = reader.ReadUInt16();
         header.bone_index_count = reader.ReadUInt16();
         header.keyframe_count = reader.ReadUInt16();
-
         header.string_count = reader.ReadUInt16();
         header.string_size = reader.ReadUInt16();
         header.cls_size = reader.ReadUInt16();
-
         header.anim_count = reader.ReadUInt16();
         header.anim_file_count = reader.ReadByte();
         header.material_count = reader.ReadUInt16();

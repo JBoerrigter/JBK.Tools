@@ -11,7 +11,8 @@ internal class ModelReaderV8 : IModelFormatReader
     public NormalizedHeader ReadHeader()
     {
         var header = HeaderV8.ReadFrom(_BinaryReader);
-        return header.ToNormalized();
+        var normalized = header.ToNormalized();
+        return normalized;
     }
 
     public Model ReadModel()
