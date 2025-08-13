@@ -41,5 +41,21 @@
             Assert.Equal(0u, model.header.AnimCount);
             Assert.Equal(0, model.header.AnimFileCount);
         }
+
+        [Fact]
+        public void GbFileLoader_ShouldParse_Bones_v8()
+        {
+            var model = GbFileLoader.LoadFromFile("TestFiles/v8_bone.gb");
+
+            Assert.NotNull(model);
+        }
+
+        [Fact]
+        public void GbFileLoader_ShouldParse_Animation_v8()
+        {
+            var model = GbFileLoader.LoadFromFile("TestFiles/v8_animation_1.gb");
+
+            Assert.NotNull(model);
+        }
     }
 }
