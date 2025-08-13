@@ -1,4 +1,5 @@
-﻿using JBK.Tools.ModelLoader.FileReader;
+﻿using JBK.Tools.ModelLoader.Enums;
+using JBK.Tools.ModelLoader.FileReader;
 using JBK.Tools.ModelLoader.GbFormat.Bones;
 
 namespace JBK.Tools.ModelLoader.Parsers.GbFileParsers;
@@ -7,6 +8,12 @@ public static class BoneParser
 {
     public static void Parse(Model model, BinaryReader reader)
     {
+        if ((model.header.Flags & (byte)ModelFlags.MODEL_BONE) == 0)
+        {
+            model.bones = Array.Empty<Bone>();
+            return;
+        }
+
         model.bones = new Bone[model.header.BoneCount];
         for (int i = 0; i < model.header.BoneCount; i++)
         {

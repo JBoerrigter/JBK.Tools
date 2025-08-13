@@ -2,10 +2,10 @@
 
 public static class ModelReaderFactory
 {
-    public static IModelFormatReader Create(byte version, BinaryReader br) => version switch
+    public static IModelFormatReader Create(byte version, BinaryReader reader) => version switch
     {
-        //8 => new V8ModelReader(br),
-        12 => new ModelReaderV12(br),
+        8 => new ModelReaderV8(reader),
+        12 => new ModelReaderV12(reader),
         _ => throw new NotSupportedException($"Model version {version} not supported")
     };
 }
