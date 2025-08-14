@@ -265,7 +265,7 @@ public class GlbExporter : IExporter
                     var baseName = parts[0];
                     var path = ResolveTexturePath(baseName, texturesFolder);
 
-                    var tmpPath = System.IO.Path.ChangeExtension(path, ".png");
+                    var tmpPath = ResolveTexturePath(System.IO.Path.ChangeExtension(baseName, ".png"), texturesFolder);
                     if (File.Exists(tmpPath))
                     {
                         path = tmpPath;
