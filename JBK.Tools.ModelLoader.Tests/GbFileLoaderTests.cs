@@ -57,5 +57,15 @@
 
             Assert.NotNull(model);
         }
+
+
+        [Fact]
+        public void GbFileLoader_ShouldMerge_v8()
+        {
+            var model = GbFileLoader.LoadFromFile("TestFiles/v8.gb");
+            model = GbFileLoader.Append(model, "TestFiles/v8_bone.gb");
+
+            Assert.NotNull(model);
+        }
     }
 }
