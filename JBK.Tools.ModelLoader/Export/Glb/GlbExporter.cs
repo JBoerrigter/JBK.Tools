@@ -4,7 +4,6 @@ using SharpGLTF.Materials;
 using SharpGLTF.Scenes;
 using SharpGLTF.Transforms;
 using System.Numerics;
-using System.Text;
 
 namespace JBK.Tools.ModelLoader.Export.Glb;
 
@@ -39,7 +38,7 @@ public class GlbExporter : IExporter
         NodeBuilder[]? boneNodes = null;
         Matrix4x4[]? inverseBindMatrices = null;
 
-        var materialBuilders = BuildMaterials(sourceFile, texPath /* pass null or a configured path */);
+        var materialBuilders = BuildMaterials(sourceFile, texPath);
 
 
         // Bones
@@ -110,43 +109,9 @@ public class GlbExporter : IExporter
 
             (NodeBuilder, Matrix4x4)[]? skin = null;
 
-            if (boneNodes != null && boneNodes.Any())
-            {
-                skin = new (NodeBuilder, Matrix4x4)[boneNodes.Length];
-                for (int i = 0; i < boneNodes.Length; i++)
-                    skin[i] = (boneNodes[i], inverseBindMatrices[i]);
-            }
-            else
-            {
-                bool isSkinnedMesh =
-                    mesh.Header.vertex_type == (byte)VertexType.Blend1 ||
-                    mesh.Header.vertex_type == (byte)VertexType.Blend2 ||
-                    mesh.Header.vertex_type == (byte)VertexType.Blend3 ||
-                    mesh.Header.vertex_type == (byte)VertexType.Blend4;
-
-                if (isSkinnedMesh && mesh.BoneIndices != null && mesh.BoneIndices.Length > 0)
-                {
-                    // Reuse one dummy armature across meshes in the file
-                    var dummyArmature = new NodeBuilder("Armature_Dummy");
-                    scene.AddNode(dummyArmature);
-
-                    int maxGlobalBoneId = 0;
-                    foreach (var b in mesh.BoneIndices) if (b > maxGlobalBoneId) maxGlobalBoneId = b;
-
-                    // ensure we have nodes up to maxGlobalBoneId
-                    var dummyJoints = new List<NodeBuilder>();
-                    while (dummyJoints.Count <= maxGlobalBoneId)
-                    {
-                        var next = dummyArmature.CreateNode($"joint_{dummyJoints.Count:D3}");
-                        dummyJoints.Add(next);
-                    }
-
-                    // build the skin tuple array up to max used id
-                    skin = new (NodeBuilder, Matrix4x4)[maxGlobalBoneId + 1];
-                    for (int i = 0; i <= maxGlobalBoneId; i++)
-                        skin[i] = (dummyJoints[i], Matrix4x4.Identity);
-                }
-            }
+            skin = new (NodeBuilder, Matrix4x4)[boneNodes.Length];
+            for (int i = 0; i < boneNodes.Length; i++)
+                skin[i] = (boneNodes[i], inverseBindMatrices[i]);
 
             meshProcessor.AddToScene(scene, meshBuilder, skin);
         }
@@ -161,7 +126,6 @@ public class GlbExporter : IExporter
                 string animName = string.IsNullOrWhiteSpace(sourceFile.Animations[i].Name) ? $"animation_{i}" : sourceFile.Animations[i].Name;
                 var animation = model.CreateAnimation(animName);
 
-                // For each bone, create its animation channels
                 for (int boneIndex = 0; boneIndex < sourceFile.header.BoneCount; boneIndex++)
                 {
                     var targetNodeBuilder = boneNodes[boneIndex];
@@ -214,34 +178,8 @@ public class GlbExporter : IExporter
         return material;
     }
 
-    private static Vector4 DecodeArgbToVector4(uint argb)
-    {
-        var a = (byte)((argb >> 24) & 0xFF);
-        var r = (byte)((argb >> 16) & 0xFF);
-        var g = (byte)((argb >> 8) & 0xFF);
-        var b = (byte)(argb & 0xFF);
-        return new Vector4(r / 255.0f, g / 255.0f, b / 255.0f, a / 255.0f);
-    }
-
-    private static string? ReadSecondString(byte[] stringTable, uint offset)
-    {
-        if (offset >= stringTable.Length) return null;
-        int i = (int)offset;
-        // skip first string
-        while (i < stringTable.Length && stringTable[i] != 0) i++;
-        i++; // move to byte after first null
-        if (i >= stringTable.Length) return null;
-        int start = i;
-        while (i < stringTable.Length && stringTable[i] != 0) i++;
-        if (i <= start) return null;
-        return Encoding.ASCII.GetString(stringTable, start, i - start);
-    }
-
-    // --- helper functions to add to your exporter class/file ---
-
     private static Vector4 ArgbToVector4(uint argb, float opacityOverride = -1f)
     {
-        // input stored as 0xAARRGGBB (your comment says ARGB)
         byte a = (byte)((argb >> 24) & 0xFF);
         byte r = (byte)((argb >> 16) & 0xFF);
         byte g = (byte)((argb >> 8) & 0xFF);
@@ -254,38 +192,32 @@ public class GlbExporter : IExporter
 
         if (opacityOverride >= 0f) fa = opacityOverride;
 
-        // MaterialBuilder expects baseColor in linear RGBA space. For now we send sRGB-like values
         return new Vector4(fr, fg, fb, fa);
     }
 
     private static string[] SplitNullSeparatedStrings(string s)
     {
         if (string.IsNullOrEmpty(s)) return Array.Empty<string>();
-        // the texture field in the original format often holds multiple null-terminated strings packed together
         return s.Split(new[] { '\0' }, StringSplitOptions.RemoveEmptyEntries);
     }
 
     private static string ResolveTexturePath(string textureName, string textureFolder)
     {
         if (string.IsNullOrEmpty(textureName)) return null;
-        // textureName can already be an absolute path; try it first
         if (File.Exists(textureName)) return textureName;
 
-        // if it's just a filename, try textureFolder
         if (!string.IsNullOrEmpty(textureFolder))
         {
             var candidate = Path.Combine(textureFolder, textureName);
             if (File.Exists(candidate)) return candidate;
         }
 
-        // also try same directory as the running app
         var candidate2 = Path.Combine(AppContext.BaseDirectory, textureName);
         if (File.Exists(candidate2)) return candidate2;
 
-        return null; // not found
+        return string.Empty;
     }
 
-    // Build MaterialBuilder objects from your sourceFile structures
     private static Dictionary<int, MaterialBuilder> BuildMaterials(Model sourceFile, string texturesFolder = null)
     {
         var result = new Dictionary<int, MaterialBuilder>();
@@ -309,21 +241,18 @@ public class GlbExporter : IExporter
 
             if (mk.szTexture != 0)
             {
-                texPacked = sourceFile.GetString(mk.szTexture); // your model class has GetString(uint)
+                texPacked = sourceFile.GetString(mk.szTexture);
                 matName = Path.GetFileNameWithoutExtension(texPacked);
             }
 
-            // create builder and set base color from materialFrame (if present)
             MaterialBuilder mb = new MaterialBuilder(matName).WithDoubleSide(true).WithMetallicRoughnessShader();
             builders.Add(mk.szTexture, mb);
 
-            // map materialFrames (if exist)
             if (sourceFile.materialFrames != null && mk.m_frame < sourceFile.materialFrames.Length)
             {
                 var mf = sourceFile.materialFrames[mk.m_frame];
                 var baseColor = ArgbToVector4(mf.m_diffuse, mf.m_opacity);
                 mb = mb.WithChannelParam(KnownChannel.BaseColor, baseColor);
-                // optionally set specular/emissive heuristics from mf.m_specular or mf.mapoption if you need
             }
 
             // read textures (szTexture is an offset into the string table)
@@ -336,10 +265,10 @@ public class GlbExporter : IExporter
                     var baseName = parts[0];
                     var path = ResolveTexturePath(baseName, texturesFolder);
 
-                    var tmpPath = System.IO.Path.ChangeExtension(path, ".png"); // ensure .png extension if needed
+                    var tmpPath = System.IO.Path.ChangeExtension(path, ".png");
                     if (File.Exists(tmpPath))
                     {
-                        path = tmpPath; // use .png if it exists
+                        path = tmpPath;
                     }
 
                     if (!string.IsNullOrEmpty(path))
@@ -351,13 +280,10 @@ public class GlbExporter : IExporter
 
                 if (parts.Length >= 2)
                 {
-                    // many exporters store a second texture after a \\0 — interpret it as detail/occlusion/skin depending on your source.
                     var secondName = parts[1];
                     var path2 = ResolveTexturePath(secondName, texturesFolder);
                     if (!string.IsNullOrEmpty(path2))
                     {
-                        // guess mapping — use Occlusion or Emissive depending on your original game's meaning.
-                        // I'll attach it to Occlusion as an example:
                         mb = mb.WithChannelImage(KnownChannel.Occlusion, path2);
                     }
                 }
