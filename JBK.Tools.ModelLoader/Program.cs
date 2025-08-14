@@ -3,6 +3,33 @@ using JBK.Tools.ModelLoader.Export;
 using JBK.Tools.ModelLoader.Export.Glb;
 using JBK.Tools.ModelLoader.FileReader;
 
+
+
+string meshFile1 = @"C:\Users\Jascha\Desktop\t\M001_B1.gb";
+string meshFile2 = @"C:\Users\Jascha\Desktop\t\M001_H1.gb";
+string boneFile = @"C:\Users\Jascha\Desktop\t\T001_Bone.gb";
+string animationFile1 = @"C:\Users\Jascha\Desktop\t\T001_0_A_01.gb";
+string animationFile2 = @"C:\Users\Jascha\Desktop\t\T001_0_D_01.gb";
+string animationFile3 = @"C:\Users\Jascha\Desktop\t\T001_1_A_01.gb";
+
+string texPath = @"C:\Users\Jascha\Desktop\t\tex";
+
+Model model = GbFileLoader.LoadFromFile(meshFile1);
+model = GbFileLoader.Append(model, meshFile2);
+model = GbFileLoader.Append(model, boneFile);
+model = GbFileLoader.Append(model, animationFile1);
+//model = GbFileLoader.Append(model, animationFile2);
+model = GbFileLoader.Append(model, animationFile3);
+
+string outputPath = @"C:\Users\Jascha\Desktop\t\Converted\M001.glb";
+IExporter exporter = new GlbExporter();
+
+exporter.Export(
+            source: model,
+            texPath: texPath,
+            outputPath: outputPath);
+
+/*
 Console.WriteLine("=== GB to GLB Converter ===");
 Console.WriteLine();
 Console.WriteLine("Enter directory to convert: ");
@@ -36,7 +63,7 @@ foreach (string fileName in Directory.GetFiles(inputPath, "*.gb"))
         Console.WriteLine(ex.Message);
     }
 }
-
+*/
 //void Decode(byte key, byte[] output, byte[] input, int length)
 //{
 //    for (int i = 0; i < length; i++)

@@ -156,9 +156,9 @@ public class GlbExporter : IExporter
         // Animations
         if (sourceFile.Animations.Any() && boneNodes != null)
         {
-            foreach (var animData in sourceFile.Animations)
+            for (int i = 0; i < sourceFile.Animations.Length; i++)
             {
-                string animName = string.IsNullOrWhiteSpace(animData.Name) ? $"animation_{animData.Header.szoption}" : animData.Name;
+                string animName = string.IsNullOrWhiteSpace(sourceFile.Animations[i].Name) ? $"animation_{i}" : sourceFile.Animations[i].Name;
                 var animation = model.CreateAnimation(animName);
 
                 // For each bone, create its animation channels
@@ -172,10 +172,10 @@ public class GlbExporter : IExporter
                     var rotationKeys = new Dictionary<float, Quaternion>();
                     var scaleKeys = new Dictionary<float, Vector3>();
 
-                    for (int keyIndex = 0; keyIndex < animData.Header.keyframe_count; keyIndex++)
+                    for (int keyIndex = 0; keyIndex < sourceFile.Animations[i].Header.keyframe_count; keyIndex++)
                     {
-                        float time = animData.Keyframes[keyIndex].time / 1000.0f;
-                        ushort transformIndex = animData.BoneTransformIndices[keyIndex, boneIndex];
+                        float time = sourceFile.Animations[i].Keyframes[keyIndex].time / 1000.0f;
+                        ushort transformIndex = sourceFile.Animations[i].BoneTransformIndices[keyIndex, boneIndex];
 
                         if (transformIndex < sourceFile.AllAnimationTransforms.Length)
                         {
