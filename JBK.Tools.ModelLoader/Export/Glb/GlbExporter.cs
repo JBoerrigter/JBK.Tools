@@ -34,12 +34,11 @@ public class GlbExporter : IExporter
     public void Export(Model sourceFile, string texPath, string outputPath)
     {
         var scene = new SceneBuilder();
-        var defaultMaterial = CreateDefaultMaterial();
+        var defaultMaterial = MaterialProcessor.CreateDefaultMaterial();
         NodeBuilder[]? boneNodes = null;
         Matrix4x4[]? inverseBindMatrices = null;
 
-        var materialBuilders = BuildMaterials(sourceFile, texPath);
-
+        var materialBuilders = MaterialProcessor.ProcessMaterials(sourceFile, texPath);
 
         // Bones
         if (sourceFile.header.BoneCount > 0)
@@ -204,128 +203,5 @@ public class GlbExporter : IExporter
         model.SaveGLB(outputPath);
     }
 
-    private static MaterialBuilder CreateDefaultMaterial()
-    {
-        var material = MaterialBuilder.CreateDefault();
-        material.WithMetallicRoughnessShader()
-               .WithBaseColor(new Vector4(0.8f, 0.8f, 0.8f, 1.0f));
-        return material;
-    }
-
-    private static Vector4 ArgbToVector4(uint argb, float opacityOverride = -1f)
-    {
-        byte a = (byte)((argb >> 24) & 0xFF);
-        byte r = (byte)((argb >> 16) & 0xFF);
-        byte g = (byte)((argb >> 8) & 0xFF);
-        byte b = (byte)(argb & 0xFF);
-
-        float fa = a / 255f;
-        float fr = r / 255f;
-        float fg = g / 255f;
-        float fb = b / 255f;
-
-        if (opacityOverride >= 0f) fa = opacityOverride;
-
-        return new Vector4(fr, fg, fb, fa);
-    }
-
-    private static string[] SplitNullSeparatedStrings(string s)
-    {
-        if (string.IsNullOrEmpty(s)) return Array.Empty<string>();
-        return s.Split(new[] { '\0' }, StringSplitOptions.RemoveEmptyEntries);
-    }
-
-    private static string ResolveTexturePath(string textureName, string textureFolder)
-    {
-        if (string.IsNullOrEmpty(textureName)) return null;
-        if (File.Exists(textureName)) return textureName;
-
-        if (!string.IsNullOrEmpty(textureFolder))
-        {
-            var candidate = Path.Combine(textureFolder, textureName);
-            if (File.Exists(candidate)) return candidate;
-        }
-
-        var candidate2 = Path.Combine(AppContext.BaseDirectory, textureName);
-        if (File.Exists(candidate2)) return candidate2;
-
-        return string.Empty;
-    }
-
-    private static Dictionary<int, MaterialBuilder> BuildMaterials(Model sourceFile, string texturesFolder = null)
-    {
-        var result = new Dictionary<int, MaterialBuilder>();
-        var builders = new Dictionary<uint, MaterialBuilder>();
-
-        if (sourceFile.materialData == null) return result;
-
-        for (int i = 0; i < sourceFile.materialData.Length; i++)
-        {
-            string texPacked = string.Empty;
-            var mk = sourceFile.materialData[i];
-
-            if (mk.szTexture != 0 && builders.ContainsKey(mk.szTexture))
-            {
-                result.Add(i, builders[mk.szTexture]);
-                continue; // already processed this texture
-            }
-
-            // default name
-            var matName = $"mat_{i}";
-
-            if (mk.szTexture != 0)
-            {
-                texPacked = sourceFile.GetString(mk.szTexture);
-                matName = Path.GetFileNameWithoutExtension(texPacked);
-            }
-
-            MaterialBuilder mb = new MaterialBuilder(matName).WithDoubleSide(true).WithMetallicRoughnessShader();
-            builders.Add(mk.szTexture, mb);
-
-            if (sourceFile.materialFrames != null && mk.m_frame < sourceFile.materialFrames.Length)
-            {
-                var mf = sourceFile.materialFrames[mk.m_frame];
-                var baseColor = ArgbToVector4(mf.m_diffuse, mf.m_opacity);
-                mb = mb.WithChannelParam(KnownChannel.BaseColor, baseColor);
-            }
-
-            // read textures (szTexture is an offset into the string table)
-            if (mk.szTexture != 0)
-            {
-                var parts = SplitNullSeparatedStrings(texPacked);
-
-                if (parts.Length >= 1)
-                {
-                    var baseName = parts[0];
-                    var path = ResolveTexturePath(baseName, texturesFolder);
-
-                    var tmpPath = ResolveTexturePath(System.IO.Path.ChangeExtension(baseName, ".png"), texturesFolder);
-                    if (File.Exists(tmpPath))
-                    {
-                        path = tmpPath;
-                    }
-
-                    if (!string.IsNullOrEmpty(path))
-                    {
-                        // base color / albedo texture
-                        mb = mb.WithChannelImage(KnownChannel.BaseColor, path);
-                    }
-                }
-
-                if (parts.Length >= 2)
-                {
-                    var secondName = parts[1];
-                    var path2 = ResolveTexturePath(secondName, texturesFolder);
-                    if (!string.IsNullOrEmpty(path2))
-                    {
-                        mb = mb.WithChannelImage(KnownChannel.Occlusion, path2);
-                    }
-                }
-            }
-
-            result.Add(i, mb);
-        }
-
-        return result;
-    }
+    
 }

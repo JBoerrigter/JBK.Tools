@@ -11,15 +11,18 @@ string boneFile = @"C:\Users\Jascha\Desktop\t\T001_Bone.gb";
 string animationFile1 = @"C:\Users\Jascha\Desktop\t\T001_0_A_01.gb";
 string animationFile2 = @"C:\Users\Jascha\Desktop\t\T001_0_D_01.gb";
 string animationFile3 = @"C:\Users\Jascha\Desktop\t\T001_1_A_01.gb";
+string testFile = @"C:\Users\Jascha\Desktop\t\w_mill.gb";
+
+Model model = GbFileLoader.LoadFromFile(testFile);
 
 string texPath = @"C:\Users\Jascha\Desktop\t\tex";
 
-Model model = GbFileLoader.LoadFromFile(meshFile1);
-model = GbFileLoader.Append(model, meshFile2);
-model = GbFileLoader.Append(model, boneFile);
-model = GbFileLoader.Append(model, animationFile1);
+//Model model = GbFileLoader.LoadFromFile(meshFile1);
+//model = GbFileLoader.Append(model, meshFile2);
+//model = GbFileLoader.Append(model, boneFile);
+//model = GbFileLoader.Append(model, animationFile1);
 //model = GbFileLoader.Append(model, animationFile2);
-model = GbFileLoader.Append(model, animationFile3);
+//model = GbFileLoader.Append(model, animationFile3);
 
 string outputPath = @"C:\Users\Jascha\Desktop\t\Converted\M001.glb";
 IExporter exporter = new GlbExporter();
