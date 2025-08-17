@@ -48,6 +48,8 @@
             var model = GbFileLoader.LoadFromFile("TestFiles/v8_bone.gb");
 
             Assert.NotNull(model);
+            Assert.Equal(28, model.bones.Length);
+            Assert.Equal(255, model.bones[0].parent);
         }
 
         [Fact]
@@ -56,6 +58,13 @@
             var model = GbFileLoader.LoadFromFile("TestFiles/v8_animation_1.gb");
 
             Assert.NotNull(model);
+            Assert.Equal(1, model.header.AnimFileCount);
+            Assert.Single(model.Animations);
+            Assert.Equal(4u, model.header.KeyframeCount);
+            Assert.Equal(78u, model.header.AnimCount);
+            Assert.Equal((int)model.header.AnimCount, model.AllAnimationTransforms.Length);
+            Assert.Equal(model.Animations[0].Header.keyframe_count, model.Animations[0].Keyframes.Length);
+            Assert.Equal(model.header.BoneCount, model.Animations[0].BoneTransformIndices.GetLength(1));
         }
 
 
