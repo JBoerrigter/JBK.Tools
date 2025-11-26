@@ -44,7 +44,7 @@ public class HeightMap : IMap
     }
 
     /// <summary>
-    /// Save with Magick.NET becuase GDI+ is not able to save 16-Bit Images
+    /// Save with Magick.NET because GDI+ is not able to save 16-Bit Images
     /// </summary>
     public void Save16BitHeightmap(string filePath)
     {
