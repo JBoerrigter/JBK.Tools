@@ -1,10 +1,16 @@
 ﻿using JBK.Tools.ModelLoader;
-using JBK.Tools.ModelLoader.Export;
 using JBK.Tools.ModelLoader.Export.Glb;
 using JBK.Tools.ModelLoader.FileReader;
 
 
-
+string meshFile = @"C:\Users\Jascha\Desktop\Sample Assets\Meshes\house_01.gb";
+var mHouse = GbFileLoader.LoadFromFile(meshFile);
+GlbExporter exporter = new GlbExporter();
+string texPath = @"C:\Users\Jascha\Desktop\Sample Assets\Meshes\tex";
+string exportPath = @"C:\Users\Jascha\Desktop\Sample Assets\Meshes\house_01.glb";
+exporter.Export(mHouse, texPath, exportPath);
+return;
+/*
 string meshFile1 = @"C:\Users\Jascha\Desktop\t\M001_B1.gb";
 string meshFile2 = @"C:\Users\Jascha\Desktop\t\M001_H1.gb";
 string boneFile = @"C:\Users\Jascha\Desktop\t\T001_Bone.gb";
@@ -12,25 +18,68 @@ string animationFile1 = @"C:\Users\Jascha\Desktop\t\T001_0_A_01.gb";
 string animationFile2 = @"C:\Users\Jascha\Desktop\t\T001_0_D_01.gb";
 string animationFile3 = @"C:\Users\Jascha\Desktop\t\T001_1_A_01.gb";
 string testFile = @"C:\Users\Jascha\Desktop\t\w_mill.gb";
+*/
+//Model model = GbFileLoader.LoadFromFile(testFile);
 
-Model model = GbFileLoader.LoadFromFile(testFile);
+//string texPath = @"C:\Users\Jascha\Desktop\t\tex";
 
-string texPath = @"C:\Users\Jascha\Desktop\t\tex";
+//var m1 = GbFileLoader.LoadFromFile(@"C:\Users\Jascha\Desktop\Neuer Ordner\M001_B1.gb");
+//Console.WriteLine("bla");
 
-//Model model = GbFileLoader.LoadFromFile(meshFile1);
+//return;
+
+string folder = @"C:\Users\Jascha\Desktop\Sample Assets\Meshes";
+DirectoryInfo dir = new DirectoryInfo(folder);
+
+Model model = null;
+foreach(var file in dir.GetFiles("*.gb"))
+{
+    try
+    {
+        if (model is null)
+        {
+            model = GbFileLoader.LoadFromFile(file.FullName);
+        }else
+        {
+            GbFileLoader.Append(model, file.FullName);
+        }
+            
+    }
+    catch(NotSupportedException ex)
+    {
+        Console.WriteLine($"Can not process {file.Name}");
+        Console.WriteLine(ex.Message);
+    }
+}
+/*
+if (model is not null)
+{
+GlbExporter exporter = new GlbExporter();
+string texPath = dir.FullName + @"\tex";
+string exportPath = dir.FullName + @"\test.glb";
+exporter.Export(model, texPath, exportPath);
+Console.WriteLine("Test");
+}
+*/
+
+//string meshFile1 = @"C:\Games\Naraeha Reignited\data\UI\Quest\Daily_Quest\UI-quest01-1.gb";
+
+
+
+
 //model = GbFileLoader.Append(model, meshFile2);
 //model = GbFileLoader.Append(model, boneFile);
 //model = GbFileLoader.Append(model, animationFile1);
 //model = GbFileLoader.Append(model, animationFile2);
 //model = GbFileLoader.Append(model, animationFile3);
 
-string outputPath = @"C:\Users\Jascha\Desktop\t\Converted\M001.glb";
-IExporter exporter = new GlbExporter();
+//string outputPath = @"C:\Users\Jascha\Desktop\t\Converted\M001.glb";
+//IExporter exporter = new GlbExporter();
 
-exporter.Export(
-            source: model,
-            texPath: texPath,
-            outputPath: outputPath);
+//exporter.Export(
+//            source: model,
+//  //          texPath: texPath,
+//            outputPath: outputPath);
 
 /*
 Console.WriteLine("=== GB to GLB Converter ===");
