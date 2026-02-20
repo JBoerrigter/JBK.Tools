@@ -37,14 +37,16 @@ public class GlbExporter : IExporter
         var defaultMaterial = MaterialProcessor.CreateDefaultMaterial();
         NodeBuilder[]? boneNodes = null;
         Matrix4x4[]? inverseBindMatrices = null;
+        NodeBuilder? armatureRoot = null;
+        List<NodeBuilder>? generatedJoints = null;
 
         var materialBuilders = MaterialProcessor.ProcessMaterials(sourceFile, texPath);
 
         // Bones
         if (sourceFile.header.BoneCount > 0)
         {
-            var armature = new NodeBuilder("Armature");
-            scene.AddNode(armature);
+            armatureRoot = new NodeBuilder("Armature");
+            scene.AddNode(armatureRoot);
 
             boneNodes = new NodeBuilder[sourceFile.bones.Length];
             inverseBindMatrices = new Matrix4x4[sourceFile.bones.Length];
@@ -71,7 +73,7 @@ public class GlbExporter : IExporter
                 byte parentIndex = sourceFile.bones[i].parent;
                 if (parentIndex == 255 || parentIndex >= boneNodes.Length)
                 {
-                    armature.AddNode(boneNodes[i]);
+                    armatureRoot.AddNode(boneNodes[i]);
                 }
                 else
                 {
@@ -124,25 +126,29 @@ public class GlbExporter : IExporter
 
                 if (isSkinnedMesh && mesh.BoneIndices != null && mesh.BoneIndices.Length > 0)
                 {
-                    // Reuse one dummy armature across meshes in the file
-                    var dummyArmature = new NodeBuilder("Armature_Dummy");
-                    scene.AddNode(dummyArmature);
+                    // Build a synthetic armature once when meshes are skinned but no bone block exists.
+                    if (armatureRoot == null)
+                    {
+                        armatureRoot = new NodeBuilder("Armature");
+                        scene.AddNode(armatureRoot);
+                    }
+
+                    generatedJoints ??= new List<NodeBuilder>();
 
                     int maxGlobalBoneId = 0;
                     foreach (var b in mesh.BoneIndices) if (b > maxGlobalBoneId) maxGlobalBoneId = b;
 
                     // ensure we have nodes up to maxGlobalBoneId
-                    var dummyJoints = new List<NodeBuilder>();
-                    while (dummyJoints.Count <= maxGlobalBoneId)
+                    while (generatedJoints.Count <= maxGlobalBoneId)
                     {
-                        var next = dummyArmature.CreateNode($"joint_{dummyJoints.Count:D3}");
-                        dummyJoints.Add(next);
+                        var next = armatureRoot.CreateNode($"joint_{generatedJoints.Count:D3}");
+                        generatedJoints.Add(next);
                     }
 
                     // build the skin tuple array up to max used id
                     skin = new (NodeBuilder, Matrix4x4)[maxGlobalBoneId + 1];
                     for (int i = 0; i <= maxGlobalBoneId; i++)
-                        skin[i] = (dummyJoints[i], Matrix4x4.Identity);
+                        skin[i] = (generatedJoints[i], Matrix4x4.Identity);
                 }
             }
 
