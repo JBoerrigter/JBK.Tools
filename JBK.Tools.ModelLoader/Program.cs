@@ -1,171 +1,385 @@
-﻿using JBK.Tools.ModelLoader;
+using JBK.Tools.ModelLoader;
+using JBK.Tools.ModelLoader.Export;
 using JBK.Tools.ModelLoader.Export.Glb;
 using JBK.Tools.ModelLoader.FileReader;
+using System.CommandLine;
+using System.CommandLine.Parsing;
 
-
-string meshFile = @"C:\Users\Jascha\Desktop\Sample Assets\Meshes\house_01.gb";
-var mHouse = GbFileLoader.LoadFromFile(meshFile);
-GlbExporter exporter = new GlbExporter();
-string texPath = @"C:\Users\Jascha\Desktop\Sample Assets\Meshes\tex";
-string exportPath = @"C:\Users\Jascha\Desktop\Sample Assets\Meshes\house_01.glb";
-exporter.Export(mHouse, texPath, exportPath);
-return;
-/*
-string meshFile1 = @"C:\Users\Jascha\Desktop\t\M001_B1.gb";
-string meshFile2 = @"C:\Users\Jascha\Desktop\t\M001_H1.gb";
-string boneFile = @"C:\Users\Jascha\Desktop\t\T001_Bone.gb";
-string animationFile1 = @"C:\Users\Jascha\Desktop\t\T001_0_A_01.gb";
-string animationFile2 = @"C:\Users\Jascha\Desktop\t\T001_0_D_01.gb";
-string animationFile3 = @"C:\Users\Jascha\Desktop\t\T001_1_A_01.gb";
-string testFile = @"C:\Users\Jascha\Desktop\t\w_mill.gb";
-*/
-//Model model = GbFileLoader.LoadFromFile(testFile);
-
-//string texPath = @"C:\Users\Jascha\Desktop\t\tex";
-
-//var m1 = GbFileLoader.LoadFromFile(@"C:\Users\Jascha\Desktop\Neuer Ordner\M001_B1.gb");
-//Console.WriteLine("bla");
-
-//return;
-
-string folder = @"C:\Users\Jascha\Desktop\Sample Assets\Meshes";
-DirectoryInfo dir = new DirectoryInfo(folder);
-
-Model model = null;
-foreach(var file in dir.GetFiles("*.gb"))
+var filenameOption = new Option<string>("--filename")
 {
-    try
+    Description = "Process one .gb file"
+};
+
+var pathOption = new Option<string>("--path")
+{
+    Description = "Process all .gb files in a folder"
+};
+
+var combineOption = new Option<bool>("--combine")
+{
+    Description = "Merge loaded files into one export (folder mode)"
+};
+
+var exportOption = new Option<string>("--export")
+{
+    Description = "Export format: glb|obj",
+    DefaultValueFactory = _ => "glb"
+};
+
+var texOption = new Option<string>("--tex")
+{
+    Description = "Texture folder override (default: <input>/tex)"
+};
+
+var outOption = new Option<string>("--out")
+{
+    Description = "Output directory or output file path"
+};
+
+var patternOption = new Option<string>("--pattern")
+{
+    Description = "File pattern in folder mode",
+    DefaultValueFactory = _ => "*.gb"
+};
+
+var recursiveOption = new Option<bool>("--recursive")
+{
+    Description = "Search subdirectories in folder mode"
+};
+
+var failFastOption = new Option<bool>("--fail-fast")
+{
+    Description = "Stop on first error"
+};
+
+var verboseOption = new Option<bool>("--verbose")
+{
+    Description = "Verbose logging"
+};
+
+var root = new RootCommand("JBK.Tools.ModelLoader CLI");
+root.Add(filenameOption);
+root.Add(pathOption);
+root.Add(combineOption);
+root.Add(exportOption);
+root.Add(texOption);
+root.Add(outOption);
+root.Add(patternOption);
+root.Add(recursiveOption);
+root.Add(failFastOption);
+root.Add(verboseOption);
+
+root.Validators.Add(result =>
+{
+    var fileName = result.GetValue(filenameOption);
+    var path = result.GetValue(pathOption);
+    var export = result.GetValue(exportOption);
+    var combine = result.GetValue(combineOption);
+
+    var hasFile = !string.IsNullOrWhiteSpace(fileName);
+    var hasPath = !string.IsNullOrWhiteSpace(path);
+
+    if (hasFile == hasPath)
     {
-        if (model is null)
+        result.AddError("Specify exactly one of --filename or --path.");
+    }
+
+    if (!string.Equals(export, "glb", StringComparison.OrdinalIgnoreCase)
+        && !string.Equals(export, "obj", StringComparison.OrdinalIgnoreCase))
+    {
+        result.AddError("Invalid --export value. Use glb or obj.");
+    }
+
+    if (combine && hasFile)
+    {
+        result.AddError("--combine is only meaningful with --path.");
+    }
+});
+
+root.SetAction(parseResult => Execute(
+    parseResult,
+    filenameOption,
+    pathOption,
+    combineOption,
+    exportOption,
+    texOption,
+    outOption,
+    patternOption,
+    recursiveOption,
+    failFastOption,
+    verboseOption));
+
+return root.Parse(args).Invoke();
+
+static int Execute(
+    ParseResult parseResult,
+    Option<string> filenameOption,
+    Option<string> pathOption,
+    Option<bool> combineOption,
+    Option<string> exportOption,
+    Option<string> texOption,
+    Option<string> outOption,
+    Option<string> patternOption,
+    Option<bool> recursiveOption,
+    Option<bool> failFastOption,
+    Option<bool> verboseOption)
+{
+    var options = new CliOptions
+    {
+        FileName = parseResult.GetValue(filenameOption),
+        Path = parseResult.GetValue(pathOption),
+        Combine = parseResult.GetValue(combineOption),
+        ExportFormat = parseResult.GetValue(exportOption) ?? "glb",
+        TexturePath = parseResult.GetValue(texOption),
+        OutPath = parseResult.GetValue(outOption),
+        Pattern = parseResult.GetValue(patternOption) ?? "*.gb",
+        Recursive = parseResult.GetValue(recursiveOption),
+        FailFast = parseResult.GetValue(failFastOption),
+        Verbose = parseResult.GetValue(verboseOption)
+    };
+
+    if (!NormalizeAndValidatePaths(options, out var error))
+    {
+        Console.Error.WriteLine(error);
+        return 1;
+    }
+
+    if (options.ExportFormat.Equals("obj", StringComparison.OrdinalIgnoreCase))
+    {
+        Console.Error.WriteLine("OBJ export is not implemented yet. Use --export glb.");
+        return 1;
+    }
+
+    var exporter = CreateExporter(options.ExportFormat);
+    var sourceFiles = ResolveSourceFiles(options);
+
+    if (sourceFiles.Count == 0)
+    {
+        Console.Error.WriteLine("No .gb files found to process.");
+        return 1;
+    }
+
+    return options.Combine
+        ? ExportCombined(sourceFiles, options, exporter)
+        : ExportIndividually(sourceFiles, options, exporter);
+}
+
+static bool NormalizeAndValidatePaths(CliOptions options, out string error)
+{
+    if (!string.IsNullOrWhiteSpace(options.FileName))
+    {
+        var fullPath = Path.GetFullPath(options.FileName);
+        if (!File.Exists(fullPath))
         {
-            model = GbFileLoader.LoadFromFile(file.FullName);
-        }else
-        {
-            GbFileLoader.Append(model, file.FullName);
+            error = $"Input file not found: {fullPath}";
+            return false;
         }
-            
+
+        options.FileName = fullPath;
     }
-    catch(NotSupportedException ex)
+
+    if (!string.IsNullOrWhiteSpace(options.Path))
     {
-        Console.WriteLine($"Can not process {file.Name}");
-        Console.WriteLine(ex.Message);
+        var fullPath = Path.GetFullPath(options.Path);
+        if (!Directory.Exists(fullPath))
+        {
+            error = $"Input directory not found: {fullPath}";
+            return false;
+        }
+
+        options.Path = fullPath;
     }
+
+    if (!string.IsNullOrWhiteSpace(options.TexturePath))
+    {
+        options.TexturePath = Path.GetFullPath(options.TexturePath);
+    }
+
+    if (!string.IsNullOrWhiteSpace(options.OutPath))
+    {
+        options.OutPath = Path.GetFullPath(options.OutPath);
+    }
+
+    error = string.Empty;
+    return true;
 }
-/*
-if (model is not null)
+
+static int ExportCombined(IReadOnlyList<string> sourceFiles, CliOptions options, IExporter exporter)
 {
-GlbExporter exporter = new GlbExporter();
-string texPath = dir.FullName + @"\tex";
-string exportPath = dir.FullName + @"\test.glb";
-exporter.Export(model, texPath, exportPath);
-Console.WriteLine("Test");
+    Model merged = null;
+
+    foreach (var file in sourceFiles)
+    {
+        try
+        {
+            merged = merged is null
+                ? GbFileLoader.LoadFromFile(file)
+                : GbFileLoader.Append(merged, file);
+
+            if (options.Verbose)
+            {
+                Console.WriteLine($"Loaded {file}");
+            }
+        }
+        catch (Exception ex)
+        {
+            Console.Error.WriteLine($"Error loading {file}: {ex.Message}");
+            if (options.FailFast)
+            {
+                return 1;
+            }
+        }
+    }
+
+    if (merged is null)
+    {
+        Console.Error.WriteLine("No valid input models could be loaded.");
+        return 1;
+    }
+
+    var extension = GetOutputExtension(options.ExportFormat);
+    var outputPath = ResolveCombinedOutputPath(sourceFiles, options, extension);
+    Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+
+    var texturePath = ResolveTexturePath(options, sourceFiles[0]);
+    exporter.Export(merged, texturePath, outputPath);
+    Console.WriteLine($"Exported combined model -> {outputPath}");
+    return 0;
 }
-*/
 
-//string meshFile1 = @"C:\Games\Naraeha Reignited\data\UI\Quest\Daily_Quest\UI-quest01-1.gb";
-
-
-
-
-//model = GbFileLoader.Append(model, meshFile2);
-//model = GbFileLoader.Append(model, boneFile);
-//model = GbFileLoader.Append(model, animationFile1);
-//model = GbFileLoader.Append(model, animationFile2);
-//model = GbFileLoader.Append(model, animationFile3);
-
-//string outputPath = @"C:\Users\Jascha\Desktop\t\Converted\M001.glb";
-//IExporter exporter = new GlbExporter();
-
-//exporter.Export(
-//            source: model,
-//  //          texPath: texPath,
-//            outputPath: outputPath);
-
-/*
-Console.WriteLine("=== GB to GLB Converter ===");
-Console.WriteLine();
-Console.WriteLine("Enter directory to convert: ");
-string? inputPath = Console.ReadLine()?.Trim();
-//inputPath = @"C:\Users\Jascha\Desktop\t";
-if (string.IsNullOrEmpty(inputPath)) return;
-
-string outputPath = Path.Combine(inputPath, "Converted");
-Directory.CreateDirectory(outputPath);
-
-string outputFile;
-IExporter exporter = new GlbExporter();
-
-foreach (string fileName in Directory.GetFiles(inputPath, "*.gb"))
+static int ExportIndividually(IReadOnlyList<string> sourceFiles, CliOptions options, IExporter exporter)
 {
-    try
-    {
-        Model model = GbFileLoader.LoadFromFile(fileName);
+    var failures = 0;
+    var extension = GetOutputExtension(options.ExportFormat);
 
-        outputFile = Path.GetFileName(fileName);
-        outputFile = Path.ChangeExtension(outputFile, ".glb");
-        outputFile = Path.Combine(outputPath, outputFile);
-
-        exporter.Export(
-            source: model,
-            texPath: Path.Combine(inputPath, "tex"),
-            outputPath: outputFile);
-    }
-    catch (Exception ex)
+    foreach (var file in sourceFiles)
     {
-        Console.WriteLine(ex.Message);
+        try
+        {
+            var model = GbFileLoader.LoadFromFile(file);
+            var outputPath = ResolvePerFileOutputPath(file, options, extension);
+            Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
+
+            var texturePath = ResolveTexturePath(options, file);
+            exporter.Export(model, texturePath, outputPath);
+            Console.WriteLine($"Exported {Path.GetFileName(file)} -> {outputPath}");
+        }
+        catch (Exception ex)
+        {
+            failures++;
+            Console.Error.WriteLine($"Error processing {file}: {ex.Message}");
+            if (options.FailFast)
+            {
+                return 1;
+            }
+        }
     }
+
+    if (failures > 0)
+    {
+        Console.Error.WriteLine($"Completed with {failures} failure(s).");
+        return 1;
+    }
+
+    return 0;
 }
-*/
-//void Decode(byte key, byte[] output, byte[] input, int length)
-//{
-//    for (int i = 0; i < length; i++)
-//    {
-//        output[i] = JBK.Tools.ModelLoader.Decode.DecodeTable[key, input[i]];
-//    }
-//}
 
-//byte key = 4;
-//byte[] decodedName = new byte[64];
-//Decode(key, decodedName, fileFormat.header.name, fileFormat.header.name.Length);
+static IExporter CreateExporter(string format)
+{
+    return format.ToLowerInvariant() switch
+    {
+        "glb" => new GlbExporter(),
+        _ => throw new NotSupportedException($"Unsupported export format '{format}'.")
+    };
+}
 
-//Console.WriteLine("Header Information:");
-//Console.WriteLine($"Version: {fileFormat.header.version}");
-//Console.WriteLine($"Bone Count: {fileFormat.header.bone_count}");
-//Console.WriteLine($"Flags: {fileFormat.header.flags}");
-//Console.WriteLine($"Mesh Count: {fileFormat.header.mesh_count}");
-//Console.WriteLine($"CRC: {fileFormat.header.crc}");
-//Console.WriteLine($"Name: {System.Text.Encoding.UTF8.GetString(decodedName).TrimEnd('\0')}");
-//Console.WriteLine($"String Offset: {fileFormat.header.szoption}");
-//Console.WriteLine("Vertex Count: " + string.Join(", ", fileFormat.header.vertex_count));
-//Console.WriteLine($"Index Count: {fileFormat.header.index_count}");
-//Console.WriteLine($"Bone Index Count: {fileFormat.header.bone_index_count}");
-//Console.WriteLine($"Keyframe Count: {fileFormat.header.keyframe_count}");
-//Console.WriteLine($"Reserved0: {fileFormat.header.reserved0}");
-//Console.WriteLine($"String Size: {fileFormat.header.string_size}");
-//Console.WriteLine($"Collision Size: {fileFormat.header.cls_size}");
-//Console.WriteLine($"Animation Count: {fileFormat.header.anim_count}");
-//Console.WriteLine($"Animation File Count: {fileFormat.header.anim_file_count}");
-//Console.WriteLine($"Reserved1: {fileFormat.header.reserved1}");
-//Console.WriteLine($"Material Count: {fileFormat.header.material_count}");
-//Console.WriteLine($"Material Frame Count: {fileFormat.header.material_frame_count}");
-//Console.WriteLine($"Minimum: {string.Join(", ", fileFormat.header.minimum)}");
-//Console.WriteLine($"Maximum: {string.Join(", ", fileFormat.header.maximum)}");
-////Console.WriteLine($"Reserved2: {fileFormat.header.reserved2}");
+static List<string> ResolveSourceFiles(CliOptions options)
+{
+    if (!string.IsNullOrWhiteSpace(options.FileName))
+    {
+        return new List<string> { options.FileName };
+    }
 
-//var materialKey = fileFormat.materialData[mesh.Header.material_ref];
-//fileFormat.materialData materialKey.m_frame
-//var matSource = new GltfMaterialSource
-//{
-//    Name = "Material_X",
-//    DiffuseColor = materialKey.m_,
-//    EmissiveColor = materialKey.emissive,
-//    SpecularColor = materialKey.specular,
-//    AmbientColor = materialKey.ambient,
-//    Power = materialKey.power,
-//    TextureRef = materialFrame.texture_ref,
-//    TextureRef2 = materialFrame.texture_ref2,
-//    Flags = materialFrame.flags
-//};
+    var searchOption = options.Recursive ? SearchOption.AllDirectories : SearchOption.TopDirectoryOnly;
+    return Directory
+        .GetFiles(options.Path, options.Pattern, searchOption)
+        .OrderBy(static f => f, StringComparer.OrdinalIgnoreCase)
+        .ToList();
+}
 
-//int matIndex = writer.AddMaterial(matSource.ToGltfMaterial());
-//exportMesh.MaterialIndex = matIndex;
+static string ResolveTexturePath(CliOptions options, string sourceFile)
+{
+    if (!string.IsNullOrWhiteSpace(options.TexturePath))
+    {
+        return options.TexturePath;
+    }
+
+    var sourceDir = Path.GetDirectoryName(Path.GetFullPath(sourceFile))!;
+    return Path.Combine(sourceDir, "tex");
+}
+
+static string ResolvePerFileOutputPath(string sourceFile, CliOptions options, string extension)
+{
+    if (string.IsNullOrWhiteSpace(options.OutPath))
+    {
+        return Path.ChangeExtension(Path.GetFullPath(sourceFile), extension);
+    }
+
+    if (HasKnownFileExtension(options.OutPath))
+    {
+        return options.OutPath;
+    }
+
+    var fileName = Path.GetFileNameWithoutExtension(sourceFile) + extension;
+    return Path.Combine(options.OutPath, fileName);
+}
+
+static string ResolveCombinedOutputPath(IReadOnlyList<string> sourceFiles, CliOptions options, string extension)
+{
+    if (!string.IsNullOrWhiteSpace(options.OutPath))
+    {
+        if (HasKnownFileExtension(options.OutPath))
+        {
+            return options.OutPath;
+        }
+
+        return Path.Combine(options.OutPath, "combined" + extension);
+    }
+
+    var baseFolder = !string.IsNullOrWhiteSpace(options.Path)
+        ? options.Path
+        : Path.GetDirectoryName(Path.GetFullPath(sourceFiles[0]))!;
+
+    return Path.Combine(baseFolder, "combined" + extension);
+}
+
+static bool HasKnownFileExtension(string path)
+{
+    var ext = Path.GetExtension(path);
+    return ext.Equals(".glb", StringComparison.OrdinalIgnoreCase)
+        || ext.Equals(".obj", StringComparison.OrdinalIgnoreCase);
+}
+
+static string GetOutputExtension(string format)
+{
+    return format.ToLowerInvariant() switch
+    {
+        "glb" => ".glb",
+        "obj" => ".obj",
+        _ => throw new NotSupportedException($"Unsupported export format '{format}'.")
+    };
+}
+
+sealed class CliOptions
+{
+    public string FileName { get; set; }
+    public string Path { get; set; }
+    public bool Combine { get; set; }
+    public string ExportFormat { get; set; } = "glb";
+    public string TexturePath { get; set; }
+    public string OutPath { get; set; }
+    public string Pattern { get; set; } = "*.gb";
+    public bool Recursive { get; set; }
+    public bool FailFast { get; set; }
+    public bool Verbose { get; set; }
+}
