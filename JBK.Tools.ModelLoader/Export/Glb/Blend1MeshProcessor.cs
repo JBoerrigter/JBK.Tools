@@ -1,4 +1,4 @@
-﻿using JBK.Tools.ModelLoader.GbFormat.Meshes;
+using JBK.Tools.ModelLoader.GbFormat.Meshes;
 using SharpGLTF.Geometry;
 using SharpGLTF.Geometry.VertexTypes;
 using SharpGLTF.Materials;
@@ -29,7 +29,13 @@ public class Blend1MeshProcessor : IMeshProcessor
 
     public void AddToScene(SceneBuilder scene, IMeshBuilder<MaterialBuilder> mesh, (NodeBuilder, Matrix4x4)[]? skin)
     {
-        scene.AddSkinnedMesh(mesh, skin);
+        if (skin != null && skin.Length > 0)
+        {
+            scene.AddSkinnedMesh(mesh, skin);
+            return;
+        }
+
+        scene.AddRigidMesh(mesh, Matrix4x4.Identity);
     }
 
     public IVertexBuilder[] GetVertexBuilders(byte[] palette, VertexBlend1[] vertices)
@@ -38,11 +44,15 @@ public class Blend1MeshProcessor : IMeshProcessor
         for (int i = 0; i < vertices.Length; i++)
         {
             var idx0 = (int)vertices[i].BoneIndices & 0xFF;
+            int joint0 = SkinWeightSanitizer.MapPaletteBone(palette, idx0);
+            var bindings = SkinWeightSanitizer.Normalize((joint0, 1f));
+
             vertexBuilders[i] = new VertexBuilder<VertexPositionNormal, VertexTexture1, VertexJoints4>(
                 new VertexPositionNormal(vertices[i].Position, vertices[i].Normal),
                 new VertexTexture1(vertices[i].TexCoord),
-                new VertexJoints4((palette[idx0], 1f)));
+                new VertexJoints4(bindings));
         }
+
         return vertexBuilders;
     }
 }

@@ -1,0 +1,11 @@
+{
+  "name": "kaltools-loader-validation",
+  "private": true,
+  "devDependencies": {
+    "gltf-validator": "2.0.0-dev.3.10"
+  },
+  "scripts": {
+    "validate:glb": "node ./scripts/validate-glb.js",
+    "validate:lamp": "dotnet run --project ./JBK.Tools.ModelLoader.csproj -- --filename ../TestAssets/lamp.gb --export glb --out ../TestAssets/lamp.glb && node ./scripts/validate-glb.js ../TestAssets/lamp.glb"
+  }
+}

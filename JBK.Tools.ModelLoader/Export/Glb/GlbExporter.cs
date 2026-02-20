@@ -1,7 +1,8 @@
-﻿using JBK.Tools.ModelLoader.Enums;
+using JBK.Tools.ModelLoader.Enums;
 using JBK.Tools.ModelLoader.FileReader;
 using SharpGLTF.Materials;
 using SharpGLTF.Scenes;
+using SharpGLTF.Schema2;
 using SharpGLTF.Transforms;
 using System.Numerics;
 
@@ -9,18 +10,21 @@ namespace JBK.Tools.ModelLoader.Export.Glb;
 
 public class GlbExporter : IExporter
 {
-    Dictionary<FaceType, IIndexProcessor> _IndexProcessors;
-    Dictionary<VertexType, IMeshProcessor> _MeshProcessors;
+    private readonly Dictionary<FaceType, IIndexProcessor> _indexProcessors;
+    private readonly Dictionary<VertexType, IMeshProcessor> _meshProcessors;
+    private readonly GlbExporterOptions _options;
 
-    public GlbExporter()
+    public GlbExporter(GlbExporterOptions? options = null)
     {
-        _IndexProcessors = new Dictionary<FaceType, IIndexProcessor>
+        _options = options ?? new GlbExporterOptions();
+
+        _indexProcessors = new Dictionary<FaceType, IIndexProcessor>
         {
             { FaceType.TriangleList, new ListIndexProcessor() },
             { FaceType.TriangleStrip, new StripIndexProcessor() }
         };
 
-        _MeshProcessors = new Dictionary<VertexType, IMeshProcessor>
+        _meshProcessors = new Dictionary<VertexType, IMeshProcessor>
         {
             { VertexType.Rigid, new RigidMeshProcessor() },
             { VertexType.RigidDouble, new RigidDoubleMeshProcessor() },
@@ -39,33 +43,43 @@ public class GlbExporter : IExporter
         Matrix4x4[]? inverseBindMatrices = null;
         NodeBuilder? armatureRoot = null;
         List<NodeBuilder>? generatedJoints = null;
+        (NodeBuilder, Matrix4x4)[]? sharedBoneSkin = null;
 
         var materialBuilders = MaterialProcessor.ProcessMaterials(sourceFile, texPath);
 
-        // Bones
         if (sourceFile.header.BoneCount > 0)
         {
-            armatureRoot = new NodeBuilder("Armature");
-            scene.AddNode(armatureRoot);
-
             boneNodes = new NodeBuilder[sourceFile.bones.Length];
             inverseBindMatrices = new Matrix4x4[sourceFile.bones.Length];
+            Matrix4x4[] bindWorldMatrices = new Matrix4x4[sourceFile.bones.Length];
 
             for (int i = 0; i < sourceFile.bones.Length; i++)
             {
                 var columnMajorInverseBindPose = sourceFile.bones[i].matrix;
                 inverseBindMatrices[i] = columnMajorInverseBindPose;
-                Matrix4x4.Invert(columnMajorInverseBindPose, out var columnMajorLocalTransform);
-                var node = new NodeBuilder($"bone_{i}");
-                if (Matrix4x4.Decompose(columnMajorLocalTransform, out var scale, out var rotation, out var translation))
+                Matrix4x4.Invert(columnMajorInverseBindPose, out bindWorldMatrices[i]);
+                boneNodes[i] = new NodeBuilder($"bone_{i}");
+            }
+
+            for (int i = 0; i < sourceFile.bones.Length; i++)
+            {
+                byte parentIndex = sourceFile.bones[i].parent;
+                Matrix4x4 localBindMatrix = bindWorldMatrices[i];
+
+                if (parentIndex != 255 && parentIndex < bindWorldMatrices.Length)
                 {
-                    node.LocalTransform = new AffineTransform(translation, rotation, scale);
+                    Matrix4x4.Invert(bindWorldMatrices[parentIndex], out var inverseParentWorld);
+                    localBindMatrix = bindWorldMatrices[i] * inverseParentWorld;
+                }
+
+                if (Matrix4x4.Decompose(localBindMatrix, out var scale, out var rotation, out var translation))
+                {
+                    boneNodes[i].LocalTransform = new AffineTransform(translation, rotation, scale);
                 }
                 else
                 {
-                    node.LocalMatrix = columnMajorLocalTransform;
+                    boneNodes[i].LocalMatrix = localBindMatrix;
                 }
-                boneNodes[i] = node;
             }
 
             for (int i = 0; i < sourceFile.bones.Length; i++)
@@ -73,7 +87,7 @@ public class GlbExporter : IExporter
                 byte parentIndex = sourceFile.bones[i].parent;
                 if (parentIndex == 255 || parentIndex >= boneNodes.Length)
                 {
-                    armatureRoot.AddNode(boneNodes[i]);
+                    scene.AddNode(boneNodes[i]);
                 }
                 else
                 {
@@ -81,24 +95,20 @@ public class GlbExporter : IExporter
                 }
             }
 
-            const float boneTipLength = 0.1f;
-            foreach (var boneNode in boneNodes)
+            if (boneNodes.Length > 0)
             {
-                if (!boneNode.VisualChildren.Any())
+                sharedBoneSkin = new (NodeBuilder, Matrix4x4)[boneNodes.Length];
+                for (int i = 0; i < boneNodes.Length; i++)
                 {
-                    var tipNode = new NodeBuilder($"{boneNode.Name}_tip");
-                    tipNode.LocalTransform = new AffineTransform(Quaternion.Identity, Vector3.UnitY * boneTipLength);
-
-                    boneNode.AddNode(tipNode);
+                    sharedBoneSkin[i] = (boneNodes[i], inverseBindMatrices[i]);
                 }
             }
         }
 
-        // Meshes
         foreach (var mesh in sourceFile.meshes)
         {
-            var indexProcessor = _IndexProcessors[(FaceType)mesh.Header.face_type];
-            var meshProcessor = _MeshProcessors[(VertexType)mesh.Header.vertex_type];
+            var indexProcessor = _indexProcessors[(FaceType)mesh.Header.face_type];
+            var meshProcessor = _meshProcessors[(VertexType)mesh.Header.vertex_type];
 
             MaterialBuilder matForMesh = defaultMaterial;
             if (mesh.Header.material_ref >= 0 && materialBuilders.TryGetValue(mesh.Header.material_ref, out var mb))
@@ -107,14 +117,11 @@ public class GlbExporter : IExporter
             }
 
             var meshBuilder = meshProcessor.Process(indexProcessor, matForMesh, mesh);
-
             (NodeBuilder, Matrix4x4)[]? skin = null;
 
-            if (boneNodes != null && boneNodes.Any())
+            if (sharedBoneSkin != null)
             {
-                skin = new (NodeBuilder, Matrix4x4)[boneNodes.Length];
-                for (int i = 0; i < boneNodes.Length; i++)
-                    skin[i] = (boneNodes[i], inverseBindMatrices[i]);
+                skin = sharedBoneSkin;
             }
             else
             {
@@ -126,7 +133,6 @@ public class GlbExporter : IExporter
 
                 if (isSkinnedMesh && mesh.BoneIndices != null && mesh.BoneIndices.Length > 0)
                 {
-                    // Build a synthetic armature once when meshes are skinned but no bone block exists.
                     if (armatureRoot == null)
                     {
                         armatureRoot = new NodeBuilder("Armature");
@@ -136,19 +142,25 @@ public class GlbExporter : IExporter
                     generatedJoints ??= new List<NodeBuilder>();
 
                     int maxGlobalBoneId = 0;
-                    foreach (var b in mesh.BoneIndices) if (b > maxGlobalBoneId) maxGlobalBoneId = b;
+                    foreach (var b in mesh.BoneIndices)
+                    {
+                        if (b > maxGlobalBoneId)
+                        {
+                            maxGlobalBoneId = b;
+                        }
+                    }
 
-                    // ensure we have nodes up to maxGlobalBoneId
                     while (generatedJoints.Count <= maxGlobalBoneId)
                     {
                         var next = armatureRoot.CreateNode($"joint_{generatedJoints.Count:D3}");
                         generatedJoints.Add(next);
                     }
 
-                    // build the skin tuple array up to max used id
                     skin = new (NodeBuilder, Matrix4x4)[maxGlobalBoneId + 1];
                     for (int i = 0; i <= maxGlobalBoneId; i++)
+                    {
                         skin[i] = (generatedJoints[i], Matrix4x4.Identity);
+                    }
                 }
             }
 
@@ -157,57 +169,214 @@ public class GlbExporter : IExporter
 
         var model = scene.ToGltf2();
 
-        // Animations
+        AssignMeshNodeNames(model);
+        CanonicalizeEquivalentSkins(model);
+
+        foreach (var skin in model.LogicalSkins)
+        {
+            if (skin.Skeleton == null && skin.JointsCount > 0)
+            {
+                var rootJoint = skin.Joints[0];
+                while (rootJoint.VisualParent != null && skin.Joints.Contains(rootJoint.VisualParent))
+                {
+                    rootJoint = rootJoint.VisualParent;
+                }
+
+                skin.Skeleton = rootJoint;
+            }
+        }
+
         if (sourceFile.Animations.Any() && boneNodes != null)
         {
-            for (int i = 0; i < sourceFile.Animations.Length; i++)
+            for (int clipIndex = 0; clipIndex < sourceFile.Animations.Length; clipIndex++)
             {
-                string animName = string.IsNullOrWhiteSpace(sourceFile.Animations[i].Name) ? $"animation_{i}" : sourceFile.Animations[i].Name;
+                string animName = string.IsNullOrWhiteSpace(sourceFile.Animations[clipIndex].Name)
+                    ? $"animation_{clipIndex}"
+                    : sourceFile.Animations[clipIndex].Name;
                 var animation = model.CreateAnimation(animName);
 
                 for (int boneIndex = 0; boneIndex < sourceFile.header.BoneCount; boneIndex++)
                 {
                     var targetNodeBuilder = boneNodes[boneIndex];
                     var targetNode = model.LogicalNodes.FirstOrDefault(n => n.Name == targetNodeBuilder.Name);
-                    if (targetNode == null) continue;
+                    if (targetNode == null)
+                    {
+                        continue;
+                    }
 
                     var translationKeys = new Dictionary<float, Vector3>();
                     var rotationKeys = new Dictionary<float, Quaternion>();
                     var scaleKeys = new Dictionary<float, Vector3>();
 
-                    for (int keyIndex = 0; keyIndex < sourceFile.Animations[i].Header.keyframe_count; keyIndex++)
+                    for (int keyIndex = 0; keyIndex < sourceFile.Animations[clipIndex].Header.keyframe_count; keyIndex++)
                     {
-                        float time = sourceFile.Animations[i].Keyframes[keyIndex].time / 1000.0f;
-                        ushort transformIndex = sourceFile.Animations[i].BoneTransformIndices[keyIndex, boneIndex];
-
-                        if (transformIndex < sourceFile.AllAnimationTransforms.Length)
+                        float time = sourceFile.Animations[clipIndex].Keyframes[keyIndex].time / 1000.0f;
+                        if (!float.IsFinite(time))
                         {
-                            var transform = sourceFile.AllAnimationTransforms[transformIndex];
-                            translationKeys[time] = transform.pos;
-                            rotationKeys[time] = transform.quat;
-                            scaleKeys[time] = transform.scale.LengthSquared() > 0 ? transform.scale : Vector3.One;
+                            continue;
                         }
+
+                        ushort transformIndex = sourceFile.Animations[clipIndex].BoneTransformIndices[keyIndex, boneIndex];
+                        if (transformIndex >= sourceFile.AllAnimationTransforms.Length)
+                        {
+                            continue;
+                        }
+
+                        var transform = sourceFile.AllAnimationTransforms[transformIndex];
+                        if (!IsFinite(transform.pos) || !IsFinite(transform.quat) || !IsFinite(transform.scale))
+                        {
+                            continue;
+                        }
+
+                        translationKeys[time] = transform.pos;
+                        rotationKeys[time] = NormalizeOrIdentity(transform.quat);
+                        scaleKeys[time] = NormalizeScaleOrOne(transform.scale);
                     }
 
                     if (translationKeys.Count > 1)
                     {
-                        animation.CreateTranslationChannel(targetNode, translationKeys, true);
+                        animation.CreateTranslationChannel(targetNode, SortKeys(translationKeys), true);
                     }
+
                     if (rotationKeys.Count > 1)
                     {
-                        animation.CreateRotationChannel(targetNode, rotationKeys, true);
+                        animation.CreateRotationChannel(targetNode, SortKeys(rotationKeys), true);
                     }
+
                     if (scaleKeys.Count > 1)
                     {
-                        animation.CreateScaleChannel(targetNode, scaleKeys, true);
+                        animation.CreateScaleChannel(targetNode, SortKeys(scaleKeys), true);
                     }
                 }
             }
         }
 
-
         model.SaveGLB(outputPath);
+        GlbConformanceDiagnostics.ValidateAndReport(outputPath, _options.ExportDiagnostics);
     }
 
-    
+    private static void AssignMeshNodeNames(ModelRoot model)
+    {
+        var usedNames = new HashSet<string>(StringComparer.Ordinal);
+        foreach (var node in model.LogicalNodes)
+        {
+            if (!string.IsNullOrWhiteSpace(node.Name))
+            {
+                usedNames.Add(node.Name);
+            }
+        }
+
+        for (int i = 0; i < model.LogicalNodes.Count; i++)
+        {
+            var node = model.LogicalNodes[i];
+            if (node.Mesh == null || !string.IsNullOrWhiteSpace(node.Name))
+            {
+                continue;
+            }
+
+            var baseName = string.IsNullOrWhiteSpace(node.Mesh.Name) ? "MeshNode" : node.Mesh.Name;
+            var candidate = baseName;
+            int suffix = 1;
+            while (!usedNames.Add(candidate))
+            {
+                candidate = $"{baseName}_{suffix++}";
+            }
+
+            node.Name = candidate;
+        }
+    }
+
+    private static void CanonicalizeEquivalentSkins(ModelRoot model)
+    {
+        if (model.LogicalSkins.Count <= 1)
+        {
+            return;
+        }
+
+        var canonical = model.LogicalSkins[0];
+        for (int i = 0; i < model.LogicalNodes.Count; i++)
+        {
+            var node = model.LogicalNodes[i];
+            if (node.Skin == null || ReferenceEquals(node.Skin, canonical))
+            {
+                continue;
+            }
+
+            if (AreEquivalentSkins(canonical, node.Skin))
+            {
+                node.Skin = canonical;
+            }
+        }
+    }
+
+    private static bool AreEquivalentSkins(Skin a, Skin b)
+    {
+        if (a.JointsCount != b.JointsCount)
+        {
+            return false;
+        }
+
+        for (int i = 0; i < a.JointsCount; i++)
+        {
+            if (!ReferenceEquals(a.Joints[i], b.Joints[i]))
+            {
+                return false;
+            }
+        }
+
+        if (!ReferenceEquals(a.Skeleton, b.Skeleton))
+        {
+            return false;
+        }
+
+        return true;
+    }
+
+
+    private static Quaternion NormalizeOrIdentity(Quaternion value)
+    {
+        float lenSq = value.LengthSquared();
+        if (!float.IsFinite(lenSq) || lenSq < 1e-8f)
+        {
+            return Quaternion.Identity;
+        }
+
+        return Quaternion.Normalize(value);
+    }
+
+    private static Vector3 NormalizeScaleOrOne(Vector3 value)
+    {
+        if (!IsFinite(value))
+        {
+            return Vector3.One;
+        }
+
+        if (MathF.Abs(value.X) < 1e-8f && MathF.Abs(value.Y) < 1e-8f && MathF.Abs(value.Z) < 1e-8f)
+        {
+            return Vector3.One;
+        }
+
+        return value;
+    }
+
+    private static SortedDictionary<float, TValue> SortKeys<TValue>(Dictionary<float, TValue> source)
+    {
+        var sorted = new SortedDictionary<float, TValue>();
+        foreach (var keyValue in source)
+        {
+            sorted[keyValue.Key] = keyValue.Value;
+        }
+
+        return sorted;
+    }
+
+    private static bool IsFinite(Vector3 value)
+    {
+        return float.IsFinite(value.X) && float.IsFinite(value.Y) && float.IsFinite(value.Z);
+    }
+
+    private static bool IsFinite(Quaternion value)
+    {
+        return float.IsFinite(value.X) && float.IsFinite(value.Y) && float.IsFinite(value.Z) && float.IsFinite(value.W);
+    }
 }

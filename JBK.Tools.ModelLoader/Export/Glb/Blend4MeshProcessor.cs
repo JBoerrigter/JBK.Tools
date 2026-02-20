@@ -1,4 +1,4 @@
-﻿using JBK.Tools.ModelLoader.GbFormat.Meshes;
+using JBK.Tools.ModelLoader.GbFormat.Meshes;
 using SharpGLTF.Geometry;
 using SharpGLTF.Geometry.VertexTypes;
 using SharpGLTF.Materials;
@@ -29,7 +29,13 @@ public class Blend4MeshProcessor : IMeshProcessor
 
     public void AddToScene(SceneBuilder scene, IMeshBuilder<MaterialBuilder> mesh, (NodeBuilder, Matrix4x4)[]? skin)
     {
-        scene.AddSkinnedMesh(mesh, skin);
+        if (skin != null && skin.Length > 0)
+        {
+            scene.AddSkinnedMesh(mesh, skin);
+            return;
+        }
+
+        scene.AddRigidMesh(mesh, Matrix4x4.Identity);
     }
 
     public IVertexBuilder[] GetVertexBuilders(byte[] palette, VertexBlend4[] vertices)
@@ -41,16 +47,22 @@ public class Blend4MeshProcessor : IMeshProcessor
             var idx1 = (int)(vertices[i].BoneIndices >> 8) & 0xFF;
             var idx2 = (int)(vertices[i].BoneIndices >> 16) & 0xFF;
             var idx3 = (int)(vertices[i].BoneIndices >> 24) & 0xFF;
+            int joint0 = SkinWeightSanitizer.MapPaletteBone(palette, idx0);
+            int joint1 = SkinWeightSanitizer.MapPaletteBone(palette, idx1);
+            int joint2 = SkinWeightSanitizer.MapPaletteBone(palette, idx2);
+            int joint3 = SkinWeightSanitizer.MapPaletteBone(palette, idx3);
+            var bindings = SkinWeightSanitizer.Normalize(
+                (joint0, vertices[i].BlendWeight0),
+                (joint1, vertices[i].BlendWeight1),
+                (joint2, vertices[i].BlendWeight2),
+                (joint3, vertices[i].GetBlendWeight3()));
+
             vertexBuilders[i] = new VertexBuilder<VertexPositionNormal, VertexTexture1, VertexJoints4>(
                 new VertexPositionNormal(vertices[i].Position, vertices[i].Normal),
                 new VertexTexture1(vertices[i].TexCoord),
-                new VertexJoints4(
-                    (palette[idx0], vertices[i].BlendWeight0),
-                    (palette[idx1], vertices[i].BlendWeight1),
-                    (palette[idx2], vertices[i].BlendWeight2),
-                    (palette[idx3], vertices[i].GetBlendWeight3())
-                ));
+                new VertexJoints4(bindings));
         }
+
         return vertexBuilders;
     }
 }

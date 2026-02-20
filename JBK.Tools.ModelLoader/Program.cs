@@ -57,6 +57,11 @@ var verboseOption = new Option<bool>("--verbose")
     Description = "Verbose logging"
 };
 
+var exportDiagnosticsOption = new Option<bool>("--export-diagnostics")
+{
+    Description = "Print strict GLB conformance diagnostics after export"
+};
+
 var root = new RootCommand("JBK.Tools.ModelLoader CLI");
 root.Add(filenameOption);
 root.Add(pathOption);
@@ -68,6 +73,7 @@ root.Add(patternOption);
 root.Add(recursiveOption);
 root.Add(failFastOption);
 root.Add(verboseOption);
+root.Add(exportDiagnosticsOption);
 
 root.Validators.Add(result =>
 {
@@ -107,7 +113,8 @@ root.SetAction(parseResult => Execute(
     patternOption,
     recursiveOption,
     failFastOption,
-    verboseOption));
+    verboseOption,
+    exportDiagnosticsOption));
 
 return root.Parse(args).Invoke();
 
@@ -122,7 +129,8 @@ static int Execute(
     Option<string> patternOption,
     Option<bool> recursiveOption,
     Option<bool> failFastOption,
-    Option<bool> verboseOption)
+    Option<bool> verboseOption,
+    Option<bool> exportDiagnosticsOption)
 {
     var options = new CliOptions
     {
@@ -135,7 +143,8 @@ static int Execute(
         Pattern = parseResult.GetValue(patternOption) ?? "*.gb",
         Recursive = parseResult.GetValue(recursiveOption),
         FailFast = parseResult.GetValue(failFastOption),
-        Verbose = parseResult.GetValue(verboseOption)
+        Verbose = parseResult.GetValue(verboseOption),
+        ExportDiagnostics = parseResult.GetValue(exportDiagnosticsOption)
     };
 
     if (!NormalizeAndValidatePaths(options, out var error))
@@ -150,7 +159,7 @@ static int Execute(
         return 1;
     }
 
-    var exporter = CreateExporter(options.ExportFormat);
+    var exporter = CreateExporter(options.ExportFormat, options);
     var sourceFiles = ResolveSourceFiles(options);
 
     if (sourceFiles.Count == 0)
@@ -284,11 +293,11 @@ static int ExportIndividually(IReadOnlyList<string> sourceFiles, CliOptions opti
     return 0;
 }
 
-static IExporter CreateExporter(string format)
+static IExporter CreateExporter(string format, CliOptions options)
 {
     return format.ToLowerInvariant() switch
     {
-        "glb" => new GlbExporter(),
+        "glb" => new GlbExporter(new GlbExporterOptions { ExportDiagnostics = options.ExportDiagnostics }),
         _ => throw new NotSupportedException($"Unsupported export format '{format}'.")
     };
 }
@@ -382,4 +391,5 @@ sealed class CliOptions
     public bool Recursive { get; set; }
     public bool FailFast { get; set; }
     public bool Verbose { get; set; }
+    public bool ExportDiagnostics { get; set; }
 }
