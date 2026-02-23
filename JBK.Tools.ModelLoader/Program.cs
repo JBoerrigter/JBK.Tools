@@ -2,6 +2,7 @@ using JBK.Tools.ModelLoader;
 using JBK.Tools.ModelLoader.Export;
 using JBK.Tools.ModelLoader.Export.Glb;
 using JBK.Tools.ModelLoader.FileReader;
+using JBK.Tools.ModelLoader.Merge;
 using System.CommandLine;
 using System.CommandLine.Parsing;
 
@@ -18,6 +19,11 @@ var pathOption = new Option<string>("--path")
 var combineOption = new Option<bool>("--combine")
 {
     Description = "Merge loaded files into one export (folder mode)"
+};
+
+var canonicalBoneOption = new Option<string>("--canonical-bone")
+{
+    Description = "Canonical skeleton file used to resolve multipart mesh/animation bone references"
 };
 
 var exportOption = new Option<string>("--export")
@@ -66,6 +72,7 @@ var root = new RootCommand("JBK.Tools.ModelLoader CLI");
 root.Add(filenameOption);
 root.Add(pathOption);
 root.Add(combineOption);
+root.Add(canonicalBoneOption);
 root.Add(exportOption);
 root.Add(texOption);
 root.Add(outOption);
@@ -81,6 +88,7 @@ root.Validators.Add(result =>
     var path = result.GetValue(pathOption);
     var export = result.GetValue(exportOption);
     var combine = result.GetValue(combineOption);
+    var canonicalBone = result.GetValue(canonicalBoneOption);
 
     var hasFile = !string.IsNullOrWhiteSpace(fileName);
     var hasPath = !string.IsNullOrWhiteSpace(path);
@@ -100,6 +108,11 @@ root.Validators.Add(result =>
     {
         result.AddError("--combine is only meaningful with --path.");
     }
+
+    if (!string.IsNullOrWhiteSpace(canonicalBone) && !hasPath && !hasFile)
+    {
+        result.AddError("--canonical-bone requires --filename or --path.");
+    }
 });
 
 root.SetAction(parseResult => Execute(
@@ -107,6 +120,7 @@ root.SetAction(parseResult => Execute(
     filenameOption,
     pathOption,
     combineOption,
+    canonicalBoneOption,
     exportOption,
     texOption,
     outOption,
@@ -123,6 +137,7 @@ static int Execute(
     Option<string> filenameOption,
     Option<string> pathOption,
     Option<bool> combineOption,
+    Option<string> canonicalBoneOption,
     Option<string> exportOption,
     Option<string> texOption,
     Option<string> outOption,
@@ -137,6 +152,7 @@ static int Execute(
         FileName = parseResult.GetValue(filenameOption),
         Path = parseResult.GetValue(pathOption),
         Combine = parseResult.GetValue(combineOption),
+        CanonicalBone = parseResult.GetValue(canonicalBoneOption),
         ExportFormat = parseResult.GetValue(exportOption) ?? "glb",
         TexturePath = parseResult.GetValue(texOption),
         OutPath = parseResult.GetValue(outOption),
@@ -209,21 +225,50 @@ static bool NormalizeAndValidatePaths(CliOptions options, out string error)
         options.OutPath = Path.GetFullPath(options.OutPath);
     }
 
+    if (!string.IsNullOrWhiteSpace(options.CanonicalBone))
+    {
+        if (!Path.IsPathRooted(options.CanonicalBone) && !string.IsNullOrWhiteSpace(options.Path))
+        {
+            options.CanonicalBone = Path.GetFullPath(Path.Combine(options.Path, options.CanonicalBone));
+        }
+        else
+        {
+            options.CanonicalBone = Path.GetFullPath(options.CanonicalBone);
+        }
+
+        if (!File.Exists(options.CanonicalBone))
+        {
+            error = $"Canonical bone file not found: {options.CanonicalBone}";
+            return false;
+        }
+    }
+
     error = string.Empty;
     return true;
 }
 
 static int ExportCombined(IReadOnlyList<string> sourceFiles, CliOptions options, IExporter exporter)
 {
+    var orderedFiles = ResolveCombinedMergeOrder(sourceFiles, options);
     Model merged = null;
+    bool resolveToCanonical = !string.IsNullOrWhiteSpace(options.CanonicalBone);
+    int failures = 0;
 
-    foreach (var file in sourceFiles)
+    for (int i = 0; i < orderedFiles.Count; i++)
     {
+        var file = orderedFiles[i];
         try
         {
             merged = merged is null
                 ? GbFileLoader.LoadFromFile(file)
-                : GbFileLoader.Append(merged, file);
+                : GbFileLoader.Append(
+                    merged,
+                    file,
+                    new MergeOptions
+                    {
+                        ResolveBonesToTarget = resolveToCanonical,
+                        SourceLabel = file
+                    });
 
             if (options.Verbose)
             {
@@ -232,6 +277,7 @@ static int ExportCombined(IReadOnlyList<string> sourceFiles, CliOptions options,
         }
         catch (Exception ex)
         {
+            failures++;
             Console.Error.WriteLine($"Error loading {file}: {ex.Message}");
             if (options.FailFast)
             {
@@ -246,11 +292,17 @@ static int ExportCombined(IReadOnlyList<string> sourceFiles, CliOptions options,
         return 1;
     }
 
+    if (failures > 0)
+    {
+        Console.Error.WriteLine($"Combined export aborted with {failures} failure(s).");
+        return 1;
+    }
+
     var extension = GetOutputExtension(options.ExportFormat);
-    var outputPath = ResolveCombinedOutputPath(sourceFiles, options, extension);
+    var outputPath = ResolveCombinedOutputPath(orderedFiles, options, extension);
     Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
 
-    var texturePath = ResolveTexturePath(options, sourceFiles[0]);
+    var texturePath = ResolveTexturePath(options, orderedFiles[0]);
     exporter.Export(merged, texturePath, outputPath);
     Console.WriteLine($"Exported combined model -> {outputPath}");
     return 0;
@@ -260,12 +312,43 @@ static int ExportIndividually(IReadOnlyList<string> sourceFiles, CliOptions opti
 {
     var failures = 0;
     var extension = GetOutputExtension(options.ExportFormat);
+    bool resolveToCanonical = !string.IsNullOrWhiteSpace(options.CanonicalBone);
+    string? canonicalPath = resolveToCanonical ? options.CanonicalBone : null;
 
     foreach (var file in sourceFiles)
     {
         try
         {
-            var model = GbFileLoader.LoadFromFile(file);
+            if (resolveToCanonical
+                && !string.IsNullOrWhiteSpace(options.Path)
+                && string.Equals(file, canonicalPath, StringComparison.OrdinalIgnoreCase))
+            {
+                if (options.Verbose)
+                {
+                    Console.WriteLine($"Skipped canonical source file {file}");
+                }
+
+                continue;
+            }
+
+            Model model;
+            if (resolveToCanonical && !string.Equals(file, canonicalPath, StringComparison.OrdinalIgnoreCase))
+            {
+                model = GbFileLoader.LoadFromFile(canonicalPath!);
+                model = GbFileLoader.Append(
+                    model,
+                    file,
+                    new MergeOptions
+                    {
+                        ResolveBonesToTarget = true,
+                        SourceLabel = file
+                    });
+            }
+            else
+            {
+                model = GbFileLoader.LoadFromFile(file);
+            }
+
             var outputPath = ResolvePerFileOutputPath(file, options, extension);
             Directory.CreateDirectory(Path.GetDirectoryName(outputPath)!);
 
@@ -362,6 +445,30 @@ static string ResolveCombinedOutputPath(IReadOnlyList<string> sourceFiles, CliOp
     return Path.Combine(baseFolder, "combined" + extension);
 }
 
+static List<string> ResolveCombinedMergeOrder(IReadOnlyList<string> sourceFiles, CliOptions options)
+{
+    if (string.IsNullOrWhiteSpace(options.CanonicalBone))
+    {
+        return sourceFiles.ToList();
+    }
+
+    var canonicalPath = options.CanonicalBone;
+    var ordered = new List<string> { canonicalPath };
+
+    for (int i = 0; i < sourceFiles.Count; i++)
+    {
+        var file = sourceFiles[i];
+        if (string.Equals(file, canonicalPath, StringComparison.OrdinalIgnoreCase))
+        {
+            continue;
+        }
+
+        ordered.Add(file);
+    }
+
+    return ordered;
+}
+
 static bool HasKnownFileExtension(string path)
 {
     var ext = Path.GetExtension(path);
@@ -384,6 +491,7 @@ sealed class CliOptions
     public string FileName { get; set; }
     public string Path { get; set; }
     public bool Combine { get; set; }
+    public string CanonicalBone { get; set; }
     public string ExportFormat { get; set; } = "glb";
     public string TexturePath { get; set; }
     public string OutPath { get; set; }

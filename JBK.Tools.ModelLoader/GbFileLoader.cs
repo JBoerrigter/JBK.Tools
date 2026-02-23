@@ -21,7 +21,7 @@ public static class GbFileLoader
     /// Loads a .gb from <paramref name="path"/> and merges it into <paramref name="targetModel"/>.
     /// Use it to add meshes (body parts), bones (skeleton), or animations (motions).
     /// </summary>
-    public static Model Append(Model targetModel, string path)
+    public static Model Append(Model targetModel, string path, MergeOptions? mergeOptions = null)
     {
         using var fileStream = File.OpenRead(path);
         using var binaryReader = new BinaryReader(fileStream);
@@ -32,7 +32,7 @@ public static class GbFileLoader
         var reader = ModelReaderFactory.Create(version, binaryReader);
         var sourceModel = reader.ReadModel();
 
-        var mergeContext = new MergeContext(targetModel);
+        var mergeContext = new MergeContext(targetModel, mergeOptions);
         mergeContext.SetSource(sourceModel);
 
         BoneMerger.Merge(mergeContext);

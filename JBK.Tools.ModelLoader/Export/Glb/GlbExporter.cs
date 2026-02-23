@@ -28,6 +28,7 @@ public class GlbExporter : IExporter
         {
             { VertexType.Rigid, new RigidMeshProcessor() },
             { VertexType.RigidDouble, new RigidDoubleMeshProcessor() },
+            { VertexType.LmStatic, new RigidDoubleMeshProcessor() },
             { VertexType.Blend1, new Blend1MeshProcessor() },
             { VertexType.Blend2, new Blend2MeshProcessor() },
             { VertexType.Blend3, new Blend3MeshProcessor() },
@@ -41,9 +42,9 @@ public class GlbExporter : IExporter
         var defaultMaterial = MaterialProcessor.CreateDefaultMaterial();
         NodeBuilder[]? boneNodes = null;
         Matrix4x4[]? inverseBindMatrices = null;
-        NodeBuilder? armatureRoot = null;
         List<NodeBuilder>? generatedJoints = null;
         (NodeBuilder, Matrix4x4)[]? sharedBoneSkin = null;
+        string? syntheticRootName = null;
 
         var materialBuilders = MaterialProcessor.ProcessMaterials(sourceFile, texPath);
 
@@ -74,7 +75,7 @@ public class GlbExporter : IExporter
 
                 if (Matrix4x4.Decompose(localBindMatrix, out var scale, out var rotation, out var translation))
                 {
-                    boneNodes[i].LocalTransform = new AffineTransform(translation, rotation, scale);
+                    boneNodes[i].LocalTransform = new AffineTransform(scale, rotation, translation);
                 }
                 else
                 {
@@ -82,12 +83,14 @@ public class GlbExporter : IExporter
                 }
             }
 
+            var rootBones = new List<NodeBuilder>();
             for (int i = 0; i < sourceFile.bones.Length; i++)
             {
                 byte parentIndex = sourceFile.bones[i].parent;
                 if (parentIndex == 255 || parentIndex >= boneNodes.Length)
                 {
                     scene.AddNode(boneNodes[i]);
+                    rootBones.Add(boneNodes[i]);
                 }
                 else
                 {
@@ -95,9 +98,23 @@ public class GlbExporter : IExporter
                 }
             }
 
+            NodeBuilder? syntheticRootJoint = null;
+            if (rootBones.Count > 1)
+            {
+                syntheticRootJoint = new NodeBuilder("bone_root");
+                syntheticRootName = syntheticRootJoint.Name;
+                scene.AddNode(syntheticRootJoint);
+
+                foreach (var rootBone in rootBones)
+                {
+                    syntheticRootJoint.AddNode(rootBone);
+                }
+            }
+
             if (boneNodes.Length > 0)
             {
-                sharedBoneSkin = new (NodeBuilder, Matrix4x4)[boneNodes.Length];
+                int skinJointCount = boneNodes.Length;
+                sharedBoneSkin = new (NodeBuilder, Matrix4x4)[skinJointCount];
                 for (int i = 0; i < boneNodes.Length; i++)
                 {
                     sharedBoneSkin[i] = (boneNodes[i], inverseBindMatrices[i]);
@@ -133,12 +150,6 @@ public class GlbExporter : IExporter
 
                 if (isSkinnedMesh && mesh.BoneIndices != null && mesh.BoneIndices.Length > 0)
                 {
-                    if (armatureRoot == null)
-                    {
-                        armatureRoot = new NodeBuilder("Armature");
-                        scene.AddNode(armatureRoot);
-                    }
-
                     generatedJoints ??= new List<NodeBuilder>();
 
                     int maxGlobalBoneId = 0;
@@ -152,7 +163,18 @@ public class GlbExporter : IExporter
 
                     while (generatedJoints.Count <= maxGlobalBoneId)
                     {
-                        var next = armatureRoot.CreateNode($"joint_{generatedJoints.Count:D3}");
+                        int nextIndex = generatedJoints.Count;
+                        NodeBuilder next;
+                        if (nextIndex == 0)
+                        {
+                            next = new NodeBuilder("joint_000");
+                            scene.AddNode(next);
+                        }
+                        else
+                        {
+                            next = generatedJoints[0].CreateNode($"joint_{nextIndex:D3}");
+                        }
+
                         generatedJoints.Add(next);
                     }
 
@@ -161,6 +183,21 @@ public class GlbExporter : IExporter
                     {
                         skin[i] = (generatedJoints[i], Matrix4x4.Identity);
                     }
+                }
+            }
+
+            if (skin != null)
+            {
+                var joints = skin.Select(static s => s.Item1).ToArray();
+                if (joints.Length == 0 || !NodeBuilder.IsValidArmature(joints))
+                {
+                    if (_options.ExportDiagnostics)
+                    {
+                        Console.Error.WriteLine(
+                            $"[GLB.SKIN][WARN] Invalid armature for mesh '{mesh.Header.name}' ({joints.Length} joints). Falling back to rigid mesh export.");
+                    }
+
+                    skin = null;
                 }
             }
 
@@ -174,6 +211,16 @@ public class GlbExporter : IExporter
 
         foreach (var skin in model.LogicalSkins)
         {
+            if (!string.IsNullOrWhiteSpace(syntheticRootName))
+            {
+                var explicitRoot = model.LogicalNodes.FirstOrDefault(n => n.Name == syntheticRootName);
+                if (explicitRoot != null)
+                {
+                    skin.Skeleton = explicitRoot;
+                    continue;
+                }
+            }
+
             if (skin.Skeleton == null && skin.JointsCount > 0)
             {
                 var rootJoint = skin.Joints[0];

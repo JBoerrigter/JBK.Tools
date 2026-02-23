@@ -1,4 +1,4 @@
-﻿using JBK.Tools.ModelLoader.GbFormat.Animations;
+using JBK.Tools.ModelLoader.GbFormat.Animations;
 
 namespace JBK.Tools.ModelLoader.Merge;
 
@@ -12,7 +12,9 @@ public static class AnimationMerger
         var source = mergeContext.Source;
 
         if (source.Animations == null || source.Animations.Length == 0)
+        {
             return;
+        }
 
         int transformOffset = target.AllAnimationTransforms?.Length ?? 0;
         int addTransforms = source.AllAnimationTransforms?.Length ?? 0;
@@ -20,14 +22,27 @@ public static class AnimationMerger
         if (addTransforms > 0)
         {
             var newTransforms = new Animation[transformOffset + addTransforms];
-            if (transformOffset > 0) Array.Copy(target.AllAnimationTransforms, 0, newTransforms, 0, transformOffset);
+            if (transformOffset > 0)
+            {
+                Array.Copy(target.AllAnimationTransforms, 0, newTransforms, 0, transformOffset);
+            }
+
             Array.Copy(source.AllAnimationTransforms, 0, newTransforms, transformOffset, addTransforms);
             target.AllAnimationTransforms = newTransforms;
         }
 
         int oldAnimCount = target.Animations?.Length ?? 0;
         var newAnims = new AnimationData[oldAnimCount + source.Animations.Length];
-        if (oldAnimCount > 0) Array.Copy(target.Animations!, 0, newAnims, 0, oldAnimCount);
+        if (oldAnimCount > 0)
+        {
+            Array.Copy(target.Animations!, 0, newAnims, 0, oldAnimCount);
+        }
+
+        int[]? boneMap = mergeContext.Options.ResolveBonesToTarget
+            ? mergeContext.SourceToTargetBoneMap
+            : null;
+
+        int targetBoneCount = target.header.BoneCount;
 
         for (int i = 0; i < source.Animations.Length; i++)
         {
@@ -41,16 +56,54 @@ public static class AnimationMerger
 
             var src = sourceAnimation.BoneTransformIndices;
             int keyframes = sourceAnimation.Header.keyframe_count;
-            int bones = src.GetLength(1);
+            int sourceBones = src.GetLength(1);
 
-            var dst = new ushort[keyframes, bones];
-
-            for (int k = 0; k < keyframes; k++)
-                for (int b = 0; b < bones; b++)
+            ushort[,] dst;
+            if (boneMap != null)
+            {
+                dst = new ushort[keyframes, targetBoneCount];
+                for (int k = 0; k < keyframes; k++)
                 {
-                    ushort ix = src[k, b];
-                    dst[k, b] = (ix == NONE) ? NONE : (ushort)(ix + transformOffset);
+                    for (int b = 0; b < targetBoneCount; b++)
+                    {
+                        dst[k, b] = NONE;
+                    }
                 }
+
+                for (int sourceBone = 0; sourceBone < sourceBones; sourceBone++)
+                {
+                    if (sourceBone >= boneMap.Length || boneMap[sourceBone] < 0)
+                    {
+                        throw new InvalidOperationException(
+                            $"Animation '{sourceAnimation.Name}' in '{Label(mergeContext)}' references unresolved source bone {sourceBone}.");
+                    }
+
+                    int mappedTargetBone = boneMap[sourceBone];
+                    if (mappedTargetBone >= targetBoneCount)
+                    {
+                        throw new InvalidOperationException(
+                            $"Animation '{sourceAnimation.Name}' in '{Label(mergeContext)}' maps source bone {sourceBone} to {mappedTargetBone}, outside target bone count {targetBoneCount}.");
+                    }
+
+                    for (int k = 0; k < keyframes; k++)
+                    {
+                        ushort ix = src[k, sourceBone];
+                        dst[k, mappedTargetBone] = ix == NONE ? NONE : (ushort)(ix + transformOffset);
+                    }
+                }
+            }
+            else
+            {
+                dst = new ushort[keyframes, sourceBones];
+                for (int k = 0; k < keyframes; k++)
+                {
+                    for (int b = 0; b < sourceBones; b++)
+                    {
+                        ushort ix = src[k, b];
+                        dst[k, b] = ix == NONE ? NONE : (ushort)(ix + transformOffset);
+                    }
+                }
+            }
 
             destinationAnimation.BoneTransformIndices = dst;
             newAnims[oldAnimCount + i] = destinationAnimation;
@@ -62,7 +115,11 @@ public static class AnimationMerger
         {
             var old = target.animationNames ?? Array.Empty<string>();
             var merged = new string[old.Length + source.animationNames.Length];
-            if (old.Length > 0) Array.Copy(old, merged, old.Length);
+            if (old.Length > 0)
+            {
+                Array.Copy(old, merged, old.Length);
+            }
+
             Array.Copy(source.animationNames, 0, merged, old.Length, source.animationNames.Length);
             target.animationNames = merged;
         }
@@ -70,6 +127,12 @@ public static class AnimationMerger
         target.header.AnimFileCount = (byte)(target.Animations?.Length ?? 0);
         target.header.AnimCount = (uint)(target.AllAnimationTransforms?.Length ?? 0);
         target.header.KeyframeCount = (uint)(target.Animations?.Sum(a => a.Header.keyframe_count) ?? 0);
+    }
 
+    private static string Label(MergeContext mergeContext)
+    {
+        return string.IsNullOrWhiteSpace(mergeContext.Options.SourceLabel)
+            ? "<source>"
+            : mergeContext.Options.SourceLabel;
     }
 }
