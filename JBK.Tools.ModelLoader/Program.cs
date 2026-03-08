@@ -26,6 +26,11 @@ var canonicalBoneOption = new Option<string>("--canonical-bone")
     Description = "Canonical skeleton file used to resolve multipart mesh/animation bone references"
 };
 
+var assumeBoneOrderOption = new Option<bool>("--assume-matching-bone-order")
+{
+    Description = "If canonical bone resolution fails, fall back to source->target bone index identity when the ordered bone hierarchy matches"
+};
+
 var exportOption = new Option<string>("--export")
 {
     Description = "Export format: glb|obj",
@@ -73,6 +78,7 @@ root.Add(filenameOption);
 root.Add(pathOption);
 root.Add(combineOption);
 root.Add(canonicalBoneOption);
+root.Add(assumeBoneOrderOption);
 root.Add(exportOption);
 root.Add(texOption);
 root.Add(outOption);
@@ -89,6 +95,7 @@ root.Validators.Add(result =>
     var export = result.GetValue(exportOption);
     var combine = result.GetValue(combineOption);
     var canonicalBone = result.GetValue(canonicalBoneOption);
+    var assumeBoneOrder = result.GetValue(assumeBoneOrderOption);
 
     var hasFile = !string.IsNullOrWhiteSpace(fileName);
     var hasPath = !string.IsNullOrWhiteSpace(path);
@@ -113,6 +120,11 @@ root.Validators.Add(result =>
     {
         result.AddError("--canonical-bone requires --filename or --path.");
     }
+
+    if (assumeBoneOrder && string.IsNullOrWhiteSpace(canonicalBone))
+    {
+        result.AddError("--assume-matching-bone-order requires --canonical-bone.");
+    }
 });
 
 root.SetAction(parseResult => Execute(
@@ -121,6 +133,7 @@ root.SetAction(parseResult => Execute(
     pathOption,
     combineOption,
     canonicalBoneOption,
+    assumeBoneOrderOption,
     exportOption,
     texOption,
     outOption,
@@ -138,6 +151,7 @@ static int Execute(
     Option<string> pathOption,
     Option<bool> combineOption,
     Option<string> canonicalBoneOption,
+    Option<bool> assumeBoneOrderOption,
     Option<string> exportOption,
     Option<string> texOption,
     Option<string> outOption,
@@ -153,6 +167,7 @@ static int Execute(
         Path = parseResult.GetValue(pathOption),
         Combine = parseResult.GetValue(combineOption),
         CanonicalBone = parseResult.GetValue(canonicalBoneOption),
+        AssumeMatchingBoneOrder = parseResult.GetValue(assumeBoneOrderOption),
         ExportFormat = parseResult.GetValue(exportOption) ?? "glb",
         TexturePath = parseResult.GetValue(texOption),
         OutPath = parseResult.GetValue(outOption),
@@ -267,6 +282,7 @@ static int ExportCombined(IReadOnlyList<string> sourceFiles, CliOptions options,
                     new MergeOptions
                     {
                         ResolveBonesToTarget = resolveToCanonical,
+                        AssumeMatchingBoneOrder = options.AssumeMatchingBoneOrder,
                         SourceLabel = file
                     });
 
@@ -341,6 +357,7 @@ static int ExportIndividually(IReadOnlyList<string> sourceFiles, CliOptions opti
                     new MergeOptions
                     {
                         ResolveBonesToTarget = true,
+                        AssumeMatchingBoneOrder = options.AssumeMatchingBoneOrder,
                         SourceLabel = file
                     });
             }
@@ -492,6 +509,7 @@ sealed class CliOptions
     public string Path { get; set; }
     public bool Combine { get; set; }
     public string CanonicalBone { get; set; }
+    public bool AssumeMatchingBoneOrder { get; set; }
     public string ExportFormat { get; set; } = "glb";
     public string TexturePath { get; set; }
     public string OutPath { get; set; }

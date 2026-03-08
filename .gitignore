@@ -386,9 +386,11 @@ FodyWeavers.xsd
 !.vscode/launch.json
 !.vscode/extensions.json
 *.code-workspace
+*.codex-dotnet/
 
 # Local History for Visual Studio Code
 .history/
+TestAssets/**
 
 # Windows Installer files from build outputs
 *.cab

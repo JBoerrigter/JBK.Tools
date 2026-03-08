@@ -1,11 +1,18 @@
-﻿namespace JBK.Tools.ModelLoader.Tests
+using JBK.Tools.ModelLoader.Merge;
+
+namespace JBK.Tools.ModelLoader.Tests
 {
     public class GbFileLoaderTests
     {
+        private static string GetPath(params string[] parts)
+        {
+            return Path.GetFullPath(Path.Combine(AppContext.BaseDirectory, parts));
+        }
+
         [Fact]
         public void GbFileLoader_ShouldParse_Header_v12()
         {
-            var model = GbFileLoader.LoadFromFile("TestFiles/v12.gb");
+            var model = GbFileLoader.LoadFromFile(GetPath("TestFiles", "v12.gb"));
 
             Assert.Equal(12, model.header.Version);
             Assert.Equal(1, model.header.MeshCount);
@@ -25,7 +32,7 @@
         [Fact]
         public void GbFileLoader_ShouldParse_Header_v8()
         {
-            var model = GbFileLoader.LoadFromFile("TestFiles/v8.gb");
+            var model = GbFileLoader.LoadFromFile(GetPath("TestFiles", "v8.gb"));
 
             Assert.Equal(8, model.header.Version);
             Assert.Equal(1, model.header.MeshCount);
@@ -45,7 +52,7 @@
         [Fact]
         public void GbFileLoader_ShouldParse_Bones_v8()
         {
-            var model = GbFileLoader.LoadFromFile("TestFiles/v8_bone.gb");
+            var model = GbFileLoader.LoadFromFile(GetPath("TestFiles", "v8_bone.gb"));
 
             Assert.NotNull(model);
             Assert.Equal(28, model.bones.Length);
@@ -55,7 +62,7 @@
         [Fact]
         public void GbFileLoader_ShouldParse_Animation_v8()
         {
-            var model = GbFileLoader.LoadFromFile("TestFiles/v8_animation_1.gb");
+            var model = GbFileLoader.LoadFromFile(GetPath("TestFiles", "v8_animation_1.gb"));
 
             Assert.NotNull(model);
             Assert.Equal(1, model.header.AnimFileCount);
@@ -67,14 +74,54 @@
             Assert.Equal(model.header.BoneCount, model.Animations[0].BoneTransformIndices.GetLength(1));
         }
 
-
         [Fact]
         public void GbFileLoader_ShouldMerge_v8()
         {
-            var model = GbFileLoader.LoadFromFile("TestFiles/v8.gb");
-            model = GbFileLoader.Append(model, "TestFiles/v8_bone.gb");
+            var model = GbFileLoader.LoadFromFile(GetPath("TestFiles", "v8.gb"));
+            model = GbFileLoader.Append(model, GetPath("TestFiles", "v8_bone.gb"));
 
             Assert.NotNull(model);
+        }
+
+        [Fact]
+        public void GbFileLoader_ShouldReject_MismatchedThirdPartyCanonicalBones_ByDefault()
+        {
+            var canonicalModel = GbFileLoader.LoadFromFile(GetPath("..", "..", "..", "..", "TestAssets", "T1272_Bone.gb"));
+
+            var exception = Assert.Throws<InvalidOperationException>(() =>
+                GbFileLoader.Append(
+                    canonicalModel,
+                    GetPath("..", "..", "..", "..", "TestAssets", "M1272_B1.gb"),
+                    new MergeOptions
+                    {
+                        ResolveBonesToTarget = true,
+                        SourceLabel = "M1272_B1.gb"
+                    }));
+
+            Assert.Contains("Cannot resolve source bone 0", exception.Message);
+        }
+
+        [Fact]
+        public void GbFileLoader_ShouldMerge_ThirdPartyCanonicalBones_WhenBoneOrderIsAssumed()
+        {
+            var canonicalPath = GetPath("..", "..", "..", "..", "TestAssets", "T1272_Bone.gb");
+            var modelPath = GetPath("..", "..", "..", "..", "TestAssets", "M1272_B1.gb");
+
+            var canonicalModel = GbFileLoader.LoadFromFile(canonicalPath);
+            var merged = GbFileLoader.Append(
+                canonicalModel,
+                modelPath,
+                new MergeOptions
+                {
+                    ResolveBonesToTarget = true,
+                    AssumeMatchingBoneOrder = true,
+                    SourceLabel = "M1272_B1.gb"
+                });
+
+            Assert.Equal(77, merged.bones.Length);
+            Assert.Single(merged.meshes);
+            Assert.Equal(74, merged.meshes[0].BoneIndices.Length);
+            Assert.Equal(76, merged.meshes[0].BoneIndices.Max());
         }
     }
 }

@@ -31,7 +31,14 @@ public static class BoneMerger
                 return;
             }
 
-            mergeContext.SourceToTargetBoneMap = BuildSourceToTargetMap(sourceBones, targetBones, Label(mergeContext));
+            try
+            {
+                mergeContext.SourceToTargetBoneMap = BuildSourceToTargetMap(sourceBones, targetBones, Label(mergeContext));
+            }
+            catch (InvalidOperationException) when (mergeContext.Options.AssumeMatchingBoneOrder)
+            {
+                mergeContext.SourceToTargetBoneMap = BuildOrderedFallbackMap(sourceBones, targetBones, Label(mergeContext));
+            }
 
             if (requiredSourceBoneSlots > mergeContext.SourceToTargetBoneMap.Length)
             {
@@ -126,6 +133,31 @@ public static class BoneMerger
                 throw new InvalidOperationException(
                     $"Bone hierarchy mismatch while resolving '{label}': source bone {sourceIndex} parent {sourceParent}->{mappedParent}, canonical parent {canonicalParent}.");
             }
+        }
+
+        return map;
+    }
+
+    private static int[] BuildOrderedFallbackMap(Bone[] sourceBones, Bone[] targetBones, string label)
+    {
+        if (sourceBones.Length > targetBones.Length)
+        {
+            throw new InvalidOperationException(
+                $"Cannot apply ordered bone fallback for '{label}': source has {sourceBones.Length} bones, target has {targetBones.Length}.");
+        }
+
+        var map = new int[sourceBones.Length];
+        for (int sourceIndex = 0; sourceIndex < sourceBones.Length; sourceIndex++)
+        {
+            byte sourceParent = sourceBones[sourceIndex].parent;
+            byte targetParent = targetBones[sourceIndex].parent;
+            if (sourceParent != targetParent)
+            {
+                throw new InvalidOperationException(
+                    $"Cannot apply ordered bone fallback for '{label}': bone {sourceIndex} parent mismatch {sourceParent} != {targetParent}.");
+            }
+
+            map[sourceIndex] = sourceIndex;
         }
 
         return map;
