@@ -46,9 +46,10 @@ public class Blend1MeshProcessor : IMeshProcessor
             var idx0 = (int)vertices[i].BoneIndices & 0xFF;
             int joint0 = SkinWeightSanitizer.MapPaletteBone(palette, idx0);
             var bindings = SkinWeightSanitizer.Normalize((joint0, 1f));
+            var normal = NormalSanitizer.NormalizeOrFallback(vertices[i].Normal);
 
             vertexBuilders[i] = new VertexBuilder<VertexPositionNormal, VertexTexture1, VertexJoints4>(
-                new VertexPositionNormal(vertices[i].Position, vertices[i].Normal),
+                new VertexPositionNormal(vertices[i].Position, normal),
                 new VertexTexture1(vertices[i].TexCoord),
                 new VertexJoints4(bindings));
         }

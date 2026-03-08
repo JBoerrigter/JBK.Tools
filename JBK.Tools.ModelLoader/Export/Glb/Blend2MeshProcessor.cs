@@ -50,9 +50,10 @@ public class Blend2MeshProcessor : IMeshProcessor
             var bindings = SkinWeightSanitizer.Normalize(
                 (joint0, vertices[i].BlendWeight0),
                 (joint1, 1f - vertices[i].BlendWeight0));
+            var normal = NormalSanitizer.NormalizeOrFallback(vertices[i].Normal);
 
             vertexBuilders[i] = new VertexBuilder<VertexPositionNormal, VertexTexture1, VertexJoints4>(
-                new VertexPositionNormal(vertices[i].Position, vertices[i].Normal),
+                new VertexPositionNormal(vertices[i].Position, normal),
                 new VertexTexture1(vertices[i].TexCoord),
                 new VertexJoints4(bindings));
         }

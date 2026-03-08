@@ -72,8 +72,9 @@ public class RigidDoubleMeshProcessor : IMeshProcessor
         {
             var uv0 = vertices[i].TexCoord0;
             var uv1 = vertices[i].TexCoord1;
+            var normal = NormalSanitizer.NormalizeOrFallback(vertices[i].Normal);
             vertexBuilders[i] = new VertexBuilder<VertexPositionNormal, VertexTexture2, VertexJoints4>(
-                new VertexPositionNormal(vertices[i].Position, vertices[i].Normal),
+                new VertexPositionNormal(vertices[i].Position, normal),
                 new VertexTexture2(new Vector2(uv0.X, uv0.Y), new Vector2(uv1.X, uv1.Y)),
                 new VertexJoints4(bindings));
         }
@@ -88,8 +89,9 @@ public class RigidDoubleMeshProcessor : IMeshProcessor
         {
             var uv0 = vertices[i].TexCoord0;
             var uv1 = vertices[i].TexCoord1;
+            var normal = NormalSanitizer.NormalizeOrFallback(vertices[i].Normal);
             vertexBuilders[i] = new VertexBuilder<VertexPositionNormal, VertexTexture2, VertexEmpty>(
-                new VertexPositionNormal(vertices[i].Position, vertices[i].Normal),
+                new VertexPositionNormal(vertices[i].Position, normal),
                 new VertexTexture2(new Vector2(uv0.X, uv0.Y), new Vector2(uv1.X, uv1.Y)),
                 new VertexEmpty());
         }
