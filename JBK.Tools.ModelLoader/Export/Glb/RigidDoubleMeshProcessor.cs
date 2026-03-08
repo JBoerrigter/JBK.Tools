@@ -21,7 +21,7 @@ public class RigidDoubleMeshProcessor : IMeshProcessor
 
         if (_usesSkinning)
         {
-            var meshBuilder = new MeshBuilder<VertexPositionNormal, VertexTexture2, VertexJoints4>($"Mesh_{mesh.Header.name}");
+            var meshBuilder = new MeshBuilder<VertexPositionNormal, VertexTexture2, VertexJoints4>(mesh.GetBuilderName());
             var primitive = meshBuilder.UsePrimitive(material);
 
             int jointIndex = _primaryBoneIndex;
@@ -38,7 +38,7 @@ public class RigidDoubleMeshProcessor : IMeshProcessor
             return meshBuilder;
         }
 
-        var rigidMeshBuilder = new MeshBuilder<VertexPositionNormal, VertexTexture2, VertexEmpty>($"Mesh_{mesh.Header.name}");
+        var rigidMeshBuilder = new MeshBuilder<VertexPositionNormal, VertexTexture2, VertexEmpty>(mesh.GetBuilderName());
         var rigidPrimitive = rigidMeshBuilder.UsePrimitive(material);
         var rigidVertices = GetRigidVertexBuilders(mesh.Vertecies.OfType<VertexRigidDouble>().ToArray());
         var rigidIndices = indexProcessor.Process(mesh.Indices);

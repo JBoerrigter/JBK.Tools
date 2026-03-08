@@ -103,6 +103,8 @@ namespace JBK.Tools.ModelLoader.Tests
             Assert.Equal((int)model.header.AnimCount, model.AllAnimationTransforms.Length);
             Assert.Equal(model.Animations[0].Header.keyframe_count, model.Animations[0].Keyframes.Length);
             Assert.Equal(model.header.BoneCount, model.Animations[0].BoneTransformIndices.GetLength(1));
+            Assert.Equal(model.Animations.Length, model.animationNames.Length);
+            Assert.Equal(model.Animations[0].Name, model.animationNames[0]);
         }
 
         [Fact]
@@ -242,6 +244,7 @@ namespace JBK.Tools.ModelLoader.Tests
 
             Assert.False(string.IsNullOrWhiteSpace(expectedMeshName));
             Assert.Equal(expectedMeshName, actualMeshName);
+            Assert.Equal(expectedMeshName, merged.meshes[1].Name);
         }
 
         [Fact]
@@ -294,6 +297,17 @@ namespace JBK.Tools.ModelLoader.Tests
             Assert.Equal("clip", target.GetString(target.Animations[0].Header.szoption));
             Assert.Single(target.animationNameOffsets);
             Assert.Equal("clip", target.GetString(target.animationNameOffsets[0]));
+        }
+
+        [Fact]
+        public void GbFileLoader_ShouldResolve_MeshNames_FromStringTable()
+        {
+            var model = GbFileLoader.LoadFromFile(GetPath("TestFiles", "v12.gb"));
+            string expectedMeshName = model.GetString(model.meshes[0].Header.name);
+
+            Assert.False(string.IsNullOrWhiteSpace(expectedMeshName));
+            Assert.Equal(expectedMeshName, model.meshes[0].Name);
+            Assert.Equal($"Mesh_{expectedMeshName}", model.meshes[0].GetBuilderName());
         }
     }
 }

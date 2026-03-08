@@ -94,14 +94,21 @@ public static class AnimationParser
     {
         if (model.Animations == null || model.Animations.Length == 0)
         {
+            model.animationNames = Array.Empty<string>();
+            model.animationNameOffsets = Array.Empty<uint>();
             return;
         }
+
+        model.animationNames = new string[model.Animations.Length];
+        model.animationNameOffsets = new uint[model.Animations.Length];
 
         for (int clipIndex = 0; clipIndex < model.Animations.Length; clipIndex++)
         {
             var clip = model.Animations[clipIndex];
             clip.Name = ResolveString(model, clip.Header.szoption);
             model.Animations[clipIndex] = clip;
+            model.animationNames[clipIndex] = clip.Name;
+            model.animationNameOffsets[clipIndex] = clip.Header.szoption;
         }
 
         if (!GbTrace.AnimationTraceEnabled)

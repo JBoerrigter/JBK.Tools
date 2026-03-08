@@ -38,6 +38,7 @@ public class SharedModelParser
         StringTableParser.Parse(model, reader);
         GbTrace.Chunk("StringTable", sectionStart, reader.BaseStream.Position - sectionStart, reader.BaseStream.Position);
 
+        MeshParser.ResolveStringData(model);
         AnimationParser.ResolveStringDataAndTrace(model);
         AnimationParser.RunSanityChecks(model);
         MaterialFramesParser.Parse(model);

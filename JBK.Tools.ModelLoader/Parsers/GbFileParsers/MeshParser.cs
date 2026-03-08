@@ -96,4 +96,20 @@ public static class MeshParser
             }
         }
     }
+
+    public static void ResolveStringData(Model model)
+    {
+        if (model.meshes == null || model.meshes.Length == 0 || model.stringTable == null || model.stringTable.Length == 0)
+        {
+            return;
+        }
+
+        for (int i = 0; i < model.meshes.Length; i++)
+        {
+            uint offset = model.meshes[i].Header.name;
+            model.meshes[i].Name = offset < model.stringTable.Length
+                ? model.GetString(offset)
+                : string.Empty;
+        }
+    }
 }

@@ -194,7 +194,7 @@ public class GlbExporter : IExporter
                     if (_options.ExportDiagnostics)
                     {
                         Console.Error.WriteLine(
-                            $"[GLB.SKIN][WARN] Invalid armature for mesh '{mesh.Header.name}' ({joints.Length} joints). Falling back to rigid mesh export.");
+                            $"[GLB.SKIN][WARN] Invalid armature for mesh '{mesh.GetDisplayName()}' ({joints.Length} joints). Falling back to rigid mesh export.");
                     }
 
                     skin = null;

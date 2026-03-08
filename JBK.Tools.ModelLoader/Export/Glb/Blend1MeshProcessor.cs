@@ -11,7 +11,7 @@ public class Blend1MeshProcessor : IMeshProcessor
 {
     public IMeshBuilder<MaterialBuilder> Process(IIndexProcessor indexProcessor, MaterialBuilder material, Mesh mesh)
     {
-        var meshBuilder = new MeshBuilder<VertexPositionNormal, VertexTexture1, VertexJoints4>($"Mesh_{mesh.Header.name}");
+        var meshBuilder = new MeshBuilder<VertexPositionNormal, VertexTexture1, VertexJoints4>(mesh.GetBuilderName());
         var primitive = meshBuilder.UsePrimitive(material);
 
         var vertices = GetVertexBuilders(mesh.BoneIndices, mesh.Vertecies.OfType<VertexBlend1>().ToArray());
