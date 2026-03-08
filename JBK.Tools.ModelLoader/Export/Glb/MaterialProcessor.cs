@@ -19,6 +19,10 @@ namespace JBK.Tools.ModelLoader.Export.Glb
                 var mk = sourceFile.materialData[i];
                 var originalFileName = mk.szTexture != 0 ? sourceFile.GetString(mk.szTexture) : "unknown";
                 var key = BuildTextureKey(originalFileName);
+                if (string.IsNullOrWhiteSpace(key))
+                {
+                    key = $"material_{i}";
+                }
 
                 if (cache.TryGetValue(key, out var existing))
                 {
@@ -27,7 +31,7 @@ namespace JBK.Tools.ModelLoader.Export.Glb
                 }
 
                 var builder = new MaterialBuilder().WithDoubleSide(true).WithMetallicRoughnessShader();
-                builder.Name = BuildMaterialName(key);
+                builder.Name = BuildMaterialName(originalFileName, key, i);
 
                 builder = builder.WithChannelParam(KnownChannel.BaseColor, Vector4.One);
                 builder = builder.WithMetallicRoughness(0f, 1f);
@@ -74,9 +78,20 @@ namespace JBK.Tools.ModelLoader.Export.Glb
             return sb.ToString();
         }
 
-        private static string BuildMaterialName(string key)
+        private static string BuildMaterialName(string originalFileName, string key, int materialIndex)
         {
-            return $"Mat__Key={key}__BC={key}_albedo__N={key}_n__MR={key}_mr";
+            var name = Path.GetFileNameWithoutExtension(originalFileName);
+            if (!string.IsNullOrWhiteSpace(name))
+            {
+                return name;
+            }
+
+            if (!string.IsNullOrWhiteSpace(key))
+            {
+                return key;
+            }
+
+            return $"material_{materialIndex}";
         }
     }
 }

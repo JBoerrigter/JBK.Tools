@@ -11,6 +11,7 @@ public sealed class MergeContext
     public Model Source { get; private set; }
     public MergeOptions Options { get; }
     public int[] SourceToTargetBoneMap { get; set; }
+    public int StringOffset { get; set; }
 
     public MergeContext(Model target, MergeOptions? options = null)
     {

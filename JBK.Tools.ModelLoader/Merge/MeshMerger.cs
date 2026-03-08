@@ -12,6 +12,7 @@ namespace JBK.Tools.ModelLoader.Merge
             }
 
             var sourceMeshes = mergeContext.Source.meshes;
+            RemapMeshNameOffsets(mergeContext.Source, sourceMeshes, mergeContext.StringOffset);
             if (mergeContext.Options.ResolveBonesToTarget)
             {
                 RemapMeshBoneIndices(mergeContext, sourceMeshes);
@@ -28,6 +29,19 @@ namespace JBK.Tools.ModelLoader.Merge
             Array.Copy(sourceMeshes, 0, newMeshes, oldCount, addCount);
             mergeContext.Target.meshes = newMeshes;
             mergeContext.Target.header.MeshCount = (byte)newMeshes.Length;
+        }
+
+        private static void RemapMeshNameOffsets(FileReader.Model source, Mesh[] meshes, int stringOffset)
+        {
+            if (stringOffset == 0)
+            {
+                return;
+            }
+
+            for (int i = 0; i < meshes.Length; i++)
+            {
+                meshes[i].Header.name = StringTableMerger.RemapStringOffset(source, meshes[i].Header.name, stringOffset);
+            }
         }
 
         private static void RemapMeshBoneIndices(MergeContext mergeContext, Mesh[] meshes)

@@ -41,15 +41,18 @@ public static class AnimationMerger
         int[]? boneMap = mergeContext.Options.ResolveBonesToTarget
             ? mergeContext.SourceToTargetBoneMap
             : null;
+        int stringOffset = mergeContext.StringOffset;
 
         int targetBoneCount = target.header.BoneCount;
 
         for (int i = 0; i < source.Animations.Length; i++)
         {
             var sourceAnimation = source.Animations[i];
+            var destinationHeader = sourceAnimation.Header;
+            destinationHeader.szoption = StringTableMerger.RemapStringOffset(source, destinationHeader.szoption, stringOffset);
             var destinationAnimation = new AnimationData
             {
-                Header = sourceAnimation.Header,
+                Header = destinationHeader,
                 Keyframes = sourceAnimation.Keyframes,
                 Name = sourceAnimation.Name
             };
@@ -122,6 +125,23 @@ public static class AnimationMerger
 
             Array.Copy(source.animationNames, 0, merged, old.Length, source.animationNames.Length);
             target.animationNames = merged;
+        }
+
+        if (source.animationNameOffsets != null && source.animationNameOffsets.Length > 0)
+        {
+            var old = target.animationNameOffsets ?? Array.Empty<uint>();
+            var merged = new uint[old.Length + source.animationNameOffsets.Length];
+            if (old.Length > 0)
+            {
+                Array.Copy(old, merged, old.Length);
+            }
+
+            for (int i = 0; i < source.animationNameOffsets.Length; i++)
+            {
+                merged[old.Length + i] = StringTableMerger.RemapStringOffset(source, source.animationNameOffsets[i], stringOffset);
+            }
+
+            target.animationNameOffsets = merged;
         }
 
         target.header.AnimFileCount = (byte)(target.Animations?.Length ?? 0);

@@ -36,8 +36,12 @@ public static class GbFileLoader
         mergeContext.SetSource(sourceModel);
 
         BoneMerger.Merge(mergeContext);
+        StringTableMerger.Merge(mergeContext);
+        MaterialMerger.Merge(mergeContext);
         MeshMerger.Merge(mergeContext);
         AnimationMerger.Merge(mergeContext);
+        CollisionMerger.Merge(mergeContext);
+        HeaderMerger.Refresh(targetModel);
 
         return targetModel;
     }
