@@ -1,20 +1,18 @@
-﻿using System.Runtime.InteropServices;
+using System.Runtime.InteropServices;
 
 namespace JBK.Tools.ModelLoader.GbFormat;
 
-public struct HeaderV11
+/// <summary>
+/// GB_HEADER layout for file version 9.
+/// </summary>
+public struct HeaderV9
 {
-    const byte HeaderVersion = 11;
+    private const byte HeaderVersion = 9;
 
     public byte version;
     public byte bone_count;
     public byte flags;
     public byte mesh_count;
-    public uint crc;
-
-    //[MarshalAs(UnmanagedType.ByValArray, SizeConst = 64)]
-    //public byte[] name;
-
     public uint szoption;
 
     [MarshalAs(UnmanagedType.ByValArray, SizeConst = 12)]
@@ -32,38 +30,32 @@ public struct HeaderV11
     public ushort material_count;
     public ushort material_frame_count;
 
-    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
-    public float[] minimum;
-
-    [MarshalAs(UnmanagedType.ByValArray, SizeConst = 3)]
-    public float[] maximum;
-
     [MarshalAs(UnmanagedType.ByValArray, SizeConst = 4)]
-    public uint[] Reserved2;
+    public uint[] reserved2;
 
-    public static HeaderV11 ReadFrom(BinaryReader reader)
+    public static HeaderV9 ReadFrom(BinaryReader reader)
     {
-        HeaderV11 header = new()
+        HeaderV9 header = new()
         {
             version = reader.ReadByte()
         };
 
         if (header.version != HeaderVersion)
         {
-            throw new NotSupportedException($"Version {header.version} currently not supported.");
+            throw new NotSupportedException($"HeaderV9 reader expected version {HeaderVersion} but got {header.version}");
         }
 
         header.bone_count = reader.ReadByte();
         header.flags = reader.ReadByte();
         header.mesh_count = reader.ReadByte();
-        header.crc = reader.ReadUInt32();
-        //header.name = reader.ReadBytes(64);
         header.szoption = reader.ReadUInt32();
+
         header.vertex_count = new ushort[12];
         for (int i = 0; i < header.vertex_count.Length; i++)
         {
             header.vertex_count[i] = reader.ReadUInt16();
         }
+
         header.index_count = reader.ReadUInt16();
         header.bone_index_count = reader.ReadUInt16();
         header.keyframe_count = reader.ReadUInt16();
@@ -75,27 +67,19 @@ public struct HeaderV11
         header.reserved1 = reader.ReadByte();
         header.material_count = reader.ReadUInt16();
         header.material_frame_count = reader.ReadUInt16();
-        header.minimum = new float[3];
-        for (int i = 0; i < header.minimum.Length; i++)
+
+        header.reserved2 = new uint[4];
+        for (int i = 0; i < header.reserved2.Length; i++)
         {
-            header.minimum[i] = reader.ReadSingle();
+            header.reserved2[i] = reader.ReadUInt32();
         }
-        header.maximum = new float[3];
-        for (int i = 0; i < header.maximum.Length; i++)
-        {
-            header.maximum[i] = reader.ReadSingle();
-        }
-        header.Reserved2 = new uint[4];
-        for (int i = 0; i < 4; i++)
-        {
-            header.Reserved2[i] = reader.ReadUInt32();
-        }
+
         return header;
     }
 
     public NormalizedHeader ToNormalized()
     {
-        NormalizedHeader normalized = new()
+        return new NormalizedHeader
         {
             Version = version,
             BoneCount = bone_count,
@@ -113,6 +97,5 @@ public struct HeaderV11
             MaterialCount = material_count,
             MaterialFrameCount = material_frame_count
         };
-        return normalized;
     }
 }

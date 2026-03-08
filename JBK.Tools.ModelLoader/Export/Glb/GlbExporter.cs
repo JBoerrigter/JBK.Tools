@@ -48,7 +48,7 @@ public class GlbExporter : IExporter
 
         var materialBuilders = MaterialProcessor.ProcessMaterials(sourceFile, texPath);
 
-        if (sourceFile.header.BoneCount > 0)
+        if (sourceFile.bones is { Length: > 0 })
         {
             boneNodes = new NodeBuilder[sourceFile.bones.Length];
             inverseBindMatrices = new Matrix4x4[sourceFile.bones.Length];
@@ -242,7 +242,7 @@ public class GlbExporter : IExporter
                     : sourceFile.Animations[clipIndex].Name;
                 var animation = model.CreateAnimation(animName);
 
-                for (int boneIndex = 0; boneIndex < sourceFile.header.BoneCount; boneIndex++)
+                for (int boneIndex = 0; boneIndex < boneNodes.Length; boneIndex++)
                 {
                     var targetNodeBuilder = boneNodes[boneIndex];
                     var targetNode = model.LogicalNodes.FirstOrDefault(n => n.Name == targetNodeBuilder.Name);

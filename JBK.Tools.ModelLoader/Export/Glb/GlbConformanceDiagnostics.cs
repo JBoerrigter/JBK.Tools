@@ -229,7 +229,10 @@ internal static class GlbConformanceDiagnostics
 
         if (buffers.Count == 0)
         {
-            report.Errors.Add("Missing buffers array.");
+            if (binChunkLength.HasValue || bufferViews.Count > 0 || accessors.Count > 0)
+            {
+                report.Errors.Add("Missing buffers array.");
+            }
         }
         else if (binChunkLength.HasValue && buffers[0].ByteLength != binChunkLength.Value)
         {

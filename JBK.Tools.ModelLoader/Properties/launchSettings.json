@@ -1,0 +1,8 @@
+{
+  "profiles": {
+    "JBK.Tools.ModelLoader": {
+      "commandName": "Project",
+      "commandLineArgs": "--filename \"E:\\Conversion\\archer\\original\\Cm_0_a01.gb\" --export glb --canonical-bone \"E:\\Conversion\\archer\\Tm_bone.gb\" --out \"E:\\Conversion\\archer\\out\""
+    }
+  }
+}
