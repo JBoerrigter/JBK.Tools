@@ -73,6 +73,11 @@ var exportDiagnosticsOption = new Option<bool>("--export-diagnostics")
     Description = "Print strict GLB conformance diagnostics after export"
 };
 
+var embedTexturesOption = new Option<bool>("--embed-textures")
+{
+    Description = "Embed resolved texture images into GLB materials"
+};
+
 var root = new RootCommand("JBK.Tools.ModelLoader CLI");
 root.Add(filenameOption);
 root.Add(pathOption);
@@ -87,6 +92,7 @@ root.Add(recursiveOption);
 root.Add(failFastOption);
 root.Add(verboseOption);
 root.Add(exportDiagnosticsOption);
+root.Add(embedTexturesOption);
 
 root.Validators.Add(result =>
 {
@@ -141,7 +147,8 @@ root.SetAction(parseResult => Execute(
     recursiveOption,
     failFastOption,
     verboseOption,
-    exportDiagnosticsOption));
+    exportDiagnosticsOption,
+    embedTexturesOption));
 
 return root.Parse(args).Invoke();
 
@@ -159,7 +166,8 @@ static int Execute(
     Option<bool> recursiveOption,
     Option<bool> failFastOption,
     Option<bool> verboseOption,
-    Option<bool> exportDiagnosticsOption)
+    Option<bool> exportDiagnosticsOption,
+    Option<bool> embedTexturesOption)
 {
     var options = new CliOptions
     {
@@ -175,7 +183,8 @@ static int Execute(
         Recursive = parseResult.GetValue(recursiveOption),
         FailFast = parseResult.GetValue(failFastOption),
         Verbose = parseResult.GetValue(verboseOption),
-        ExportDiagnostics = parseResult.GetValue(exportDiagnosticsOption)
+        ExportDiagnostics = parseResult.GetValue(exportDiagnosticsOption),
+        EmbedTextures = parseResult.GetValue(embedTexturesOption)
     };
 
     if (!NormalizeAndValidatePaths(options, out var error))
@@ -397,7 +406,11 @@ static IExporter CreateExporter(string format, CliOptions options)
 {
     return format.ToLowerInvariant() switch
     {
-        "glb" => new GlbExporter(new GlbExporterOptions { ExportDiagnostics = options.ExportDiagnostics }),
+        "glb" => new GlbExporter(new GlbExporterOptions
+        {
+            ExportDiagnostics = options.ExportDiagnostics,
+            EmbedTextures = options.EmbedTextures
+        }),
         _ => throw new NotSupportedException($"Unsupported export format '{format}'.")
     };
 }
@@ -518,4 +531,5 @@ sealed class CliOptions
     public bool FailFast { get; set; }
     public bool Verbose { get; set; }
     public bool ExportDiagnostics { get; set; }
+    public bool EmbedTextures { get; set; }
 }

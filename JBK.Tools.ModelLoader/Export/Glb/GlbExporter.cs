@@ -46,7 +46,12 @@ public class GlbExporter : IExporter
         (NodeBuilder, Matrix4x4)[]? sharedBoneSkin = null;
         string? syntheticRootName = null;
 
-        var materialBuilders = MaterialProcessor.ProcessMaterials(sourceFile, texPath);
+        var materialBuilders = MaterialProcessor.ProcessMaterials(sourceFile, new MaterialProcessorOptions
+        {
+            TexturesFolder = texPath,
+            EmbedTextures = _options.EmbedTextures,
+            WarningHandler = message => Console.Error.WriteLine(message)
+        });
 
         if (sourceFile.bones is { Length: > 0 })
         {

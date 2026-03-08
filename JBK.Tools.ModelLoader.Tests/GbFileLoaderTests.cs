@@ -1,6 +1,10 @@
+using ImageMagick;
 using JBK.Tools.ModelLoader.Merge;
 using JBK.Tools.ModelLoader.Export.Glb;
 using JBK.Tools.ModelLoader.FileReader;
+using System.Buffers.Binary;
+using System.Collections;
+using System.Text.Json;
 
 namespace JBK.Tools.ModelLoader.Tests
 {
@@ -203,6 +207,124 @@ namespace JBK.Tools.ModelLoader.Tests
         }
 
         [Fact]
+        public void MaterialProcessor_ShouldKeepCurrentBehavior_WhenTextureEmbeddingDisabled()
+        {
+            var model = GbFileLoader.LoadFromFile(GetPath("TestFiles", "v12.gb"));
+            int materialRef = model.meshes[0].Header.material_ref;
+
+            string tempDir = CreateTempDirectory();
+            try
+            {
+                string textureName = model.GetString(model.materialData[materialRef].szTexture);
+                string pngPath = Path.Combine(tempDir, Path.GetFileNameWithoutExtension(textureName) + ".png");
+                WritePngTexture(pngPath);
+
+                var legacyMaterials = MaterialProcessor.ProcessMaterials(model);
+                var materials = MaterialProcessor.ProcessMaterials(model, new MaterialProcessorOptions
+                {
+                    TexturesFolder = tempDir,
+                    EmbedTextures = false
+                });
+
+                Assert.True(legacyMaterials.TryGetValue(materialRef, out var legacyMaterial));
+                Assert.True(materials.TryGetValue(materialRef, out var material));
+                Assert.Equal(legacyMaterial.Name, material.Name);
+                Assert.False(MaterialBuilderHasBoundTexture(material));
+            }
+            finally
+            {
+                Directory.Delete(tempDir, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void GlbExporter_ShouldEmbed_PngTexture_WhenEnabled()
+        {
+            var model = GbFileLoader.LoadFromFile(GetPath("TestFiles", "v12.gb"));
+            string tempDir = CreateTempDirectory();
+
+            try
+            {
+                string textureDir = Path.Combine(tempDir, "tex");
+                Directory.CreateDirectory(textureDir);
+
+                int materialRef = model.meshes[0].Header.material_ref;
+                string textureName = model.GetString(model.materialData[materialRef].szTexture);
+                string pngPath = Path.Combine(textureDir, Path.GetFileNameWithoutExtension(textureName) + ".png");
+                WritePngTexture(pngPath);
+
+                string outputPath = Path.Combine(tempDir, "png-embedded.glb");
+                new GlbExporter(new GlbExporterOptions { EmbedTextures = true }).Export(model, textureDir, outputPath);
+
+                using var glb = ReadGlb(outputPath);
+                Assert.Equal(1, GetOptionalArrayLength(glb.Json.RootElement, "images"));
+                Assert.Equal(1, GetOptionalArrayLength(glb.Json.RootElement, "textures"));
+                Assert.True(ContainsSequence(glb.Binary, PngSignature));
+            }
+            finally
+            {
+                Directory.Delete(tempDir, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void GlbExporter_ShouldEmbed_DdsTexture_AsPng_WhenEnabled()
+        {
+            var model = GbFileLoader.LoadFromFile(GetPath("TestFiles", "v12.gb"));
+            string tempDir = CreateTempDirectory();
+
+            try
+            {
+                string textureDir = Path.Combine(tempDir, "tex");
+                Directory.CreateDirectory(textureDir);
+
+                int materialRef = model.meshes[0].Header.material_ref;
+                string textureName = model.GetString(model.materialData[materialRef].szTexture);
+                string ddsPath = Path.Combine(textureDir, textureName);
+                WriteDdsTexture(ddsPath);
+
+                string outputPath = Path.Combine(tempDir, "dds-embedded.glb");
+                new GlbExporter(new GlbExporterOptions { EmbedTextures = true }).Export(model, textureDir, outputPath);
+
+                using var glb = ReadGlb(outputPath);
+                Assert.Equal(1, GetOptionalArrayLength(glb.Json.RootElement, "images"));
+                Assert.Equal(1, GetOptionalArrayLength(glb.Json.RootElement, "textures"));
+                Assert.True(ContainsSequence(glb.Binary, PngSignature));
+            }
+            finally
+            {
+                Directory.Delete(tempDir, recursive: true);
+            }
+        }
+
+        [Fact]
+        public void GlbExporter_ShouldWarnAndFallback_WhenEmbeddedTextureIsMissing()
+        {
+            var model = GbFileLoader.LoadFromFile(GetPath("TestFiles", "v12.gb"));
+            string tempDir = CreateTempDirectory();
+            var error = new StringWriter();
+            TextWriter originalError = Console.Error;
+
+            try
+            {
+                string outputPath = Path.Combine(tempDir, "missing-texture.glb");
+
+                Console.SetError(error);
+                new GlbExporter(new GlbExporterOptions { EmbedTextures = true }).Export(model, tempDir, outputPath);
+
+                using var glb = ReadGlb(outputPath);
+                Assert.Equal(0, GetOptionalArrayLength(glb.Json.RootElement, "images"));
+                Assert.Equal(0, GetOptionalArrayLength(glb.Json.RootElement, "textures"));
+                Assert.Contains("Using fallback material", error.ToString());
+            }
+            finally
+            {
+                Console.SetError(originalError);
+                Directory.Delete(tempDir, recursive: true);
+            }
+        }
+
+        [Fact]
         public void GbFileLoader_ShouldRecompute_HeaderAggregates_AfterAppend()
         {
             var path = GetPath("TestFiles", "v12.gb");
@@ -309,5 +431,144 @@ namespace JBK.Tools.ModelLoader.Tests
             Assert.Equal(expectedMeshName, model.meshes[0].Name);
             Assert.Equal($"Mesh_{expectedMeshName}", model.meshes[0].GetBuilderName());
         }
+
+        private static bool MaterialBuilderHasBoundTexture(object materialBuilder)
+        {
+            var channelsProperty = materialBuilder.GetType().GetProperty("Channels");
+            if (channelsProperty?.GetValue(materialBuilder) is not IEnumerable channels)
+            {
+                return false;
+            }
+
+            foreach (var channel in channels)
+            {
+                if (channel == null)
+                {
+                    continue;
+                }
+
+                var channelType = channel.GetType();
+                var key = channelType.GetProperty("Key")?.GetValue(channel)?.ToString();
+                if (!string.Equals(key, "BaseColor", StringComparison.Ordinal))
+                {
+                    continue;
+                }
+
+                var parameters = channelType.GetProperty("Parameters")?.GetValue(channel) as IDictionary;
+                if (parameters == null)
+                {
+                    return false;
+                }
+
+                foreach (DictionaryEntry entry in parameters)
+                {
+                    if (entry.Value?.GetType().Name.Contains("Texture", StringComparison.Ordinal) == true)
+                    {
+                        return true;
+                    }
+                }
+            }
+
+            return false;
+        }
+
+        private static GlbContents ReadGlb(string path)
+        {
+            byte[] bytes = File.ReadAllBytes(path);
+            Assert.True(bytes.Length >= 20);
+
+            Assert.Equal(0x46546C67u, BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(0, 4)));
+            Assert.Equal(2u, BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(4, 4)));
+
+            int offset = 12;
+            int jsonLength = (int)BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(offset, 4));
+            uint jsonType = BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(offset + 4, 4));
+            Assert.Equal(0x4E4F534Au, jsonType);
+            offset += 8;
+
+            string jsonText = System.Text.Encoding.UTF8.GetString(bytes, offset, jsonLength).TrimEnd('\0', ' ');
+            offset += jsonLength;
+
+            byte[] binaryChunk = Array.Empty<byte>();
+            if (offset + 8 <= bytes.Length)
+            {
+                int binaryLength = (int)BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(offset, 4));
+                uint binaryType = BinaryPrimitives.ReadUInt32LittleEndian(bytes.AsSpan(offset + 4, 4));
+                Assert.Equal(0x004E4942u, binaryType);
+                offset += 8;
+
+                binaryChunk = new byte[binaryLength];
+                Array.Copy(bytes, offset, binaryChunk, 0, binaryLength);
+            }
+
+            return new GlbContents(JsonDocument.Parse(jsonText), binaryChunk);
+        }
+
+        private static int GetOptionalArrayLength(JsonElement root, string propertyName)
+        {
+            return root.TryGetProperty(propertyName, out JsonElement property) && property.ValueKind == JsonValueKind.Array
+                ? property.GetArrayLength()
+                : 0;
+        }
+
+        private static string CreateTempDirectory()
+        {
+            string path = Path.Combine(Path.GetTempPath(), "JBK.Tools.ModelLoader.Tests", Guid.NewGuid().ToString("N"));
+            Directory.CreateDirectory(path);
+            return path;
+        }
+
+        private static void WritePngTexture(string path)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+
+            using var image = new MagickImage(MagickColors.White, 1, 1);
+            image.Format = MagickFormat.Png;
+            image.Write(path);
+        }
+
+        private static void WriteDdsTexture(string path)
+        {
+            Directory.CreateDirectory(Path.GetDirectoryName(path)!);
+
+            using var image = new MagickImage(MagickColors.White, 1, 1);
+            image.Format = MagickFormat.Dds;
+            image.Write(path);
+        }
+
+        private static bool ContainsSequence(byte[] buffer, byte[] sequence)
+        {
+            if (sequence.Length == 0 || buffer.Length < sequence.Length)
+            {
+                return false;
+            }
+
+            for (int i = 0; i <= buffer.Length - sequence.Length; i++)
+            {
+                bool match = true;
+                for (int j = 0; j < sequence.Length; j++)
+                {
+                    if (buffer[i + j] != sequence[j])
+                    {
+                        match = false;
+                        break;
+                    }
+                }
+
+                if (match)
+                {
+                    return true;
+                }
+            }
+
+            return false;
+        }
+
+        private sealed record GlbContents(JsonDocument Json, byte[] Binary) : IDisposable
+        {
+            public void Dispose() => Json.Dispose();
+        }
+
+        private static readonly byte[] PngSignature = [137, 80, 78, 71, 13, 10, 26, 10];
     }
 }
