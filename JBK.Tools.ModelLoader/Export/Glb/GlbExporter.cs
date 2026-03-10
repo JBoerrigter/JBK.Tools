@@ -61,9 +61,13 @@ public class GlbExporter : IExporter
 
             for (int i = 0; i < sourceFile.bones.Length; i++)
             {
-                var columnMajorInverseBindPose = sourceFile.bones[i].matrix;
-                inverseBindMatrices[i] = columnMajorInverseBindPose;
-                Matrix4x4.Invert(columnMajorInverseBindPose, out bindWorldMatrices[i]);
+                var inverseBindPose = SanitizeAffineTerms(NormalizeInverseBindPose(sourceFile.bones[i].matrix));
+                inverseBindMatrices[i] = inverseBindPose;
+                if (!Matrix4x4.Invert(inverseBindPose, out bindWorldMatrices[i]))
+                {
+                    throw new InvalidOperationException($"Bone {i} has a non-invertible inverse bind pose.");
+                }
+
                 boneNodes[i] = new NodeBuilder($"bone_{i}");
             }
 
@@ -74,17 +78,29 @@ public class GlbExporter : IExporter
 
                 if (parentIndex != 255 && parentIndex < bindWorldMatrices.Length)
                 {
-                    Matrix4x4.Invert(bindWorldMatrices[parentIndex], out var inverseParentWorld);
+                    if (!Matrix4x4.Invert(bindWorldMatrices[parentIndex], out var inverseParentWorld))
+                    {
+                        throw new InvalidOperationException($"Bone {i} parent {parentIndex} has a non-invertible bind matrix.");
+                    }
+
                     localBindMatrix = bindWorldMatrices[i] * inverseParentWorld;
                 }
+
+                localBindMatrix = SanitizeAffineTerms(localBindMatrix);
+                var transposedLocalBindMatrix = SanitizeAffineTerms(Matrix4x4.Transpose(localBindMatrix));
 
                 if (Matrix4x4.Decompose(localBindMatrix, out var scale, out var rotation, out var translation))
                 {
                     boneNodes[i].LocalTransform = new AffineTransform(scale, rotation, translation);
                 }
+                else if (Matrix4x4.Decompose(transposedLocalBindMatrix, out scale, out rotation, out translation))
+                {
+                    boneNodes[i].LocalTransform = new AffineTransform(scale, rotation, translation);
+                }
                 else
                 {
-                    boneNodes[i].LocalMatrix = localBindMatrix;
+                    throw new InvalidOperationException(
+                        $"Bone {i} local bind matrix is not decomposable. local={FormatMatrix(localBindMatrix)} transpose={FormatMatrix(transposedLocalBindMatrix)}");
                 }
             }
 
@@ -430,5 +446,73 @@ public class GlbExporter : IExporter
     private static bool IsFinite(Quaternion value)
     {
         return float.IsFinite(value.X) && float.IsFinite(value.Y) && float.IsFinite(value.Z) && float.IsFinite(value.W);
+    }
+
+    private static Matrix4x4 NormalizeInverseBindPose(Matrix4x4 value)
+    {
+        if (IsAffineMatrix(value))
+        {
+            return value;
+        }
+
+        var transposed = Matrix4x4.Transpose(value);
+        return IsAffineMatrix(transposed) ? transposed : value;
+    }
+
+    private static bool IsAffineMatrix(Matrix4x4 value)
+    {
+        const float epsilon = 1e-4f;
+        return float.IsFinite(value.M11)
+            && float.IsFinite(value.M12)
+            && float.IsFinite(value.M13)
+            && float.IsFinite(value.M14)
+            && float.IsFinite(value.M21)
+            && float.IsFinite(value.M22)
+            && float.IsFinite(value.M23)
+            && float.IsFinite(value.M24)
+            && float.IsFinite(value.M31)
+            && float.IsFinite(value.M32)
+            && float.IsFinite(value.M33)
+            && float.IsFinite(value.M34)
+            && float.IsFinite(value.M41)
+            && float.IsFinite(value.M42)
+            && float.IsFinite(value.M43)
+            && float.IsFinite(value.M44)
+            && MathF.Abs(value.M14) <= epsilon
+            && MathF.Abs(value.M24) <= epsilon
+            && MathF.Abs(value.M34) <= epsilon
+            && MathF.Abs(value.M44 - 1.0f) <= epsilon;
+    }
+
+    private static string FormatMatrix(Matrix4x4 value)
+    {
+        return $"[{value.M11}, {value.M12}, {value.M13}, {value.M14}; {value.M21}, {value.M22}, {value.M23}, {value.M24}; {value.M31}, {value.M32}, {value.M33}, {value.M34}; {value.M41}, {value.M42}, {value.M43}, {value.M44}]";
+    }
+
+    private static Matrix4x4 SanitizeAffineTerms(Matrix4x4 value)
+    {
+        const float epsilon = 1e-4f;
+
+        if (MathF.Abs(value.M14) <= epsilon)
+        {
+            value.M14 = 0.0f;
+        }
+
+        if (MathF.Abs(value.M24) <= epsilon)
+        {
+            value.M24 = 0.0f;
+        }
+
+        if (MathF.Abs(value.M34) <= epsilon)
+        {
+            value.M34 = 0.0f;
+        }
+
+        if (MathF.Abs(value.M44 - 1.0f) <= epsilon)
+        {
+            value.M44 = 1.0f;
+        }
+
+        return value;
     }
 }

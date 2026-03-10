@@ -325,6 +325,39 @@ namespace JBK.Tools.ModelLoader.Tests
         }
 
         [Fact]
+        public void GlbExporter_ShouldExport_MustWorkLegacyClip_WithCanonicalBone()
+        {
+            string canonicalPath = GetPath("..", "..", "..", "..", "TestAssets", "MustWork", "Tr_bone.gb");
+            string clipPath = GetPath("..", "..", "..", "..", "TestAssets", "MustWork", "Tr_0_01.gb");
+            string tempDir = CreateTempDirectory();
+
+            try
+            {
+                var model = GbFileLoader.LoadFromFile(canonicalPath);
+                model = GbFileLoader.Append(
+                    model,
+                    clipPath,
+                    new MergeOptions
+                    {
+                        ResolveBonesToTarget = true,
+                        SourceLabel = "Tr_0_01.gb"
+                    });
+
+                string outputPath = Path.Combine(tempDir, "mustwork.glb");
+                new GlbExporter().Export(model, tempDir, outputPath);
+
+                Assert.True(File.Exists(outputPath));
+                using var glb = ReadGlb(outputPath);
+                Assert.True(GetOptionalArrayLength(glb.Json.RootElement, "nodes") >= 1);
+                Assert.True(GetOptionalArrayLength(glb.Json.RootElement, "animations") >= 1);
+            }
+            finally
+            {
+                Directory.Delete(tempDir, recursive: true);
+            }
+        }
+
+        [Fact]
         public void GbFileLoader_ShouldRecompute_HeaderAggregates_AfterAppend()
         {
             var path = GetPath("TestFiles", "v12.gb");

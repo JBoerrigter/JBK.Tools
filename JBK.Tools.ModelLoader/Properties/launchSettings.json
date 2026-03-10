@@ -2,7 +2,7 @@
   "profiles": {
     "JBK.Tools.ModelLoader": {
       "commandName": "Project",
-      "commandLineArgs": "--filename \"E:\\Conversion\\archer\\original\\Cm_0_a01.gb\" --export glb --canonical-bone \"E:\\Conversion\\archer\\Tm_bone.gb\" --out \"E:\\Conversion\\archer\\out\""
+      "commandLineArgs": "--path \"C:\\Users\\Jascha\\source\\repos\\JBK.Tools\\TestAssets\\BrokenAnimations\" --export glb --canonical-bone \"C:\\Users\\Jascha\\source\\repos\\JBK.Tools\\TestAssets\\BrokenAnimations\\Tr_bone.gb\" --out \"C:\\Users\\Jascha\\source\\repos\\JBK.Tools\\TestAssets\\BrokenAnimations\\out\""
     }
   }
 }
